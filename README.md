@@ -2,13 +2,13 @@
 based on Psych engine
 <img width="294" height="177" alt="12" src="https://github.com/user-attachments/assets/d94d99d9-9423-4dfc-b6b0-430dcde4cfb0" />
 
-
 ## Installation:
 
 Refer to [the Build Instructions](./BUILDING.md)
 
 ## Credits:
 * LexyCod - Main Programmer
+* Sergo - Programmer
 * Luckymakestuff - Concepter
 * MaxidaMP3 - Concepter
 _____________________________________
