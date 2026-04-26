@@ -32,7 +32,6 @@ class CacheManager
 	public static var evictTargetMB:Int = 128;
 
 	public static var checkInterval:Float = 10.0;
-─
 
 	static var _entries:Map<String, CacheEntry> = new Map();
 	static var _lastCheck:Float = 0;
