@@ -7,6 +7,7 @@ Refer to [the Build Instructions](./BUILDING.md)
 
 ## Credits:
 * LexyCod - Main Programmer
+* sergocoder - Programmer
 * Luckymakestuff - Concepter
 * MaxidaMP3 - Concepter
 _____________________________________
