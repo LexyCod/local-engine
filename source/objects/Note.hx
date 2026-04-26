@@ -126,6 +126,10 @@ class Note extends FlxSprite
 	public var hitsoundChartEditor:Bool = true;
 	public var hitsound:String = 'hitsound';
 
+	// ─── LOCAL ENGINE: NotePool support ──────────────────────────────────────────
+	private var _poolOwned:Bool = false; // true = нота из пула, false = создана напрямую
+	// ─────────────────────────────────────────────────────────────────────────────
+
 	private function set_multSpeed(value:Float):Float {
 		resizeByRatio(value / multSpeed);
 		multSpeed = value;
@@ -135,7 +139,7 @@ class Note extends FlxSprite
 
 	public function resizeByRatio(ratio:Float) //haha funny twitter shit
 	{
-		if(isSustainNote && animation.curAnim != null && !animation.curAnim.name.endsWith('end'))
+		if(isSustainNote && animation != null && animation.curAnim != null && !animation.curAnim.name.endsWith('end'))
 		{
 			scale.y *= ratio;
 			updateHitbox();
@@ -151,6 +155,7 @@ class Note extends FlxSprite
 
 	public function defaultRGB()
 	{
+		if (rgbShader == null) return; // LOCAL ENGINE: guard
 		var arr:Array<FlxColor> = ClientPrefs.data.arrowRGB[noteData];
 		if(PlayState.isPixelStage) arr = ClientPrefs.data.arrowRGBPixel[noteData];
 
@@ -175,9 +180,11 @@ class Note extends FlxSprite
 					//but i've changed it to something more optimized with the implementation of RGBPalette:
 
 					// note colors
-					rgbShader.r = 0xFF101010;
-					rgbShader.g = 0xFFFF0000;
-					rgbShader.b = 0xFF990022;
+					if (rgbShader != null) {
+						rgbShader.r = 0xFF101010;
+						rgbShader.g = 0xFFFF0000;
+						rgbShader.b = 0xFF990022;
+					}
 
 					// splash data and colors
 					noteSplashData.r = 0xFFFF0000;
@@ -295,6 +302,177 @@ class Note extends FlxSprite
 			centerOrigin();
 		}
 		x += offsetX;
+	}
+
+	/**
+	 * LOCAL ENGINE: reinit() — переиспользование ноты из пула.
+	 * Полностью повторяет логику конструктора без super()/new Animation.
+	 * PlayState вызывает это вместо new Note() когда берёт ноту из пула.
+	 */
+	public function reinit(strumTime:Float, noteData:Int, ?prevNote:Note, ?sustainNote:Bool = false, ?inEditor:Bool = false, ?createdFrom:Dynamic = null):Void
+	{
+		if(createdFrom == null) createdFrom = PlayState.instance;
+
+		// Сброс всех полей
+		_resetGameplayFields();
+
+		if (prevNote == null) prevNote = this;
+
+		this.prevNote = prevNote;
+		isSustainNote = sustainNote;
+		this.inEditor = inEditor;
+		// moves уже false
+
+		// Позиционирование — точно как в конструкторе
+		x = 0;
+		x += (ClientPrefs.data.middleScroll ? PlayState.STRUM_X_MIDDLESCROLL : PlayState.STRUM_X) + 50;
+		y = 0;
+		y -= 2000;
+		this.strumTime = strumTime;
+		if(!inEditor) this.strumTime += ClientPrefs.data.noteOffset;
+
+		this.noteData = noteData;
+
+		if(noteData > -1) {
+			texture = ''; // reloadNote — текстура из кэша, не с диска
+			// rgbShader уже создан при первом new Note(), просто обновляем parent
+			if (rgbShader == null)
+				rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
+			else
+				rgbShader.parent = initializeGlobalRGBShader(noteData);
+			if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
+
+			x += swagWidth * (noteData);
+			if(!isSustainNote && noteData < colArray.length) {
+				animation.play(colArray[noteData % colArray.length] + 'Scroll');
+			}
+		}
+
+		if(prevNote != null)
+			prevNote.nextNote = this;
+
+		if (isSustainNote && prevNote != null)
+		{
+			alpha = 0.6;
+			multAlpha = 0.6;
+			hitsoundDisabled = true;
+			if(ClientPrefs.data.downScroll) flipY = true;
+
+			offsetX += width / 2;
+			copyAngle = false;
+
+			animation.play(colArray[noteData % colArray.length] + 'holdend');
+			updateHitbox();
+			offsetX -= width / 2;
+
+			if (PlayState.isPixelStage)
+				offsetX += 30;
+
+			if (prevNote.isSustainNote)
+			{
+				prevNote.animation.play(colArray[prevNote.noteData % colArray.length] + 'hold');
+				prevNote.scale.y *= Conductor.stepCrochet / 100 * 1.05;
+				if(createdFrom != null && createdFrom.songSpeed != null) prevNote.scale.y *= createdFrom.songSpeed;
+
+				if(PlayState.isPixelStage) {
+					prevNote.scale.y *= 1.19;
+					prevNote.scale.y *= (6 / height);
+				}
+				prevNote.updateHitbox();
+			}
+
+			if(PlayState.isPixelStage)
+			{
+				scale.y *= PlayState.daPixelZoom;
+				updateHitbox();
+			}
+			earlyHitMult = 0;
+		}
+		else if(!isSustainNote)
+		{
+			centerOffsets();
+			centerOrigin();
+		}
+		x += offsetX;
+	}
+
+	private function _resetGameplayFields():Void
+	{
+		// Разрываем старые связи
+		if (this.prevNote != null && this.prevNote != this) this.prevNote.nextNote = null;
+		if (this.nextNote != null) this.nextNote.prevNote = null;
+
+		strumTime        = 0;
+		noteData         = 0;
+		mustPress        = false;
+		canBeHit         = false;
+		tooLate          = false;
+		wasGoodHit       = false;
+		missed           = false;
+		ignoreNote       = false;
+		hitByOpponent    = false;
+		noteWasHit       = false;
+		spawned          = false;
+		blockHit         = false;
+		sustainLength    = 0;
+		isSustainNote    = false;
+		@:bypassAccessor noteType = null; // bypass set_noteType — rgbShader может быть null
+		prevNote         = null;
+		nextNote         = null;
+		parent           = null;
+		tail             = [];
+		animSuffix       = '';
+		gfNote           = false;
+		earlyHitMult     = 1;
+		lateHitMult      = 1;
+		lowPriority      = false;
+		noAnimation      = false;
+		noMissAnimation  = false;
+		hitCausesMiss    = false;
+		hitsoundDisabled = false;
+		hitsound         = 'hitsound';
+		hitsoundChartEditor = true;
+		multAlpha        = 1;
+		@:bypassAccessor multSpeed = 1; // bypass set_multSpeed — animation может быть null
+		copyX            = true;
+		copyY            = true;
+		copyAngle        = true;
+		copyAlpha        = true;
+		offsetX          = 0;
+		offsetY          = 0;
+		offsetAngle      = 0;
+		hitHealth        = 0.023;
+		missHealth       = 0.0475;
+		rating           = 'unknown';
+		ratingMod        = 0;
+		ratingDisabled   = false;
+		distance         = 2000;
+		inEditor         = false;
+		eventName        = '';
+		eventLength      = 0;
+		eventVal1        = '';
+		eventVal2        = '';
+		correctionOffset = 0;
+		alpha            = 1;
+		angle            = 0;
+		flipY            = false;
+		scale.set(1, 1);
+		scrollFactor.set(1, 1);
+		velocity.set(0, 0);
+		acceleration.set(0, 0);
+		clipRect         = null;
+
+		noteSplashData.disabled       = false;
+		noteSplashData.texture        = null;
+		noteSplashData.useGlobalShader = false;
+		noteSplashData.useRGBShader   = (PlayState.SONG != null) ? !(PlayState.SONG.disableNoteRGB == true) : true;
+		noteSplashData.antialiasing   = !PlayState.isPixelStage;
+		noteSplashData.r              = -1;
+		noteSplashData.g              = -1;
+		noteSplashData.b              = -1;
+		noteSplashData.a              = ClientPrefs.data.splashAlpha;
+
+		extraData.clear();
 	}
 
 	public static function initializeGlobalRGBShader(noteData:Int)

@@ -6,6 +6,10 @@ import backend.WeekData;
 import backend.Song;
 import backend.Section;
 import backend.Rating;
+import backend.NotePool;
+import backend.CacheManager;
+import backend.AsyncSongLoader;
+import backend.LocalEngineVersion;
 
 import flixel.FlxBasic;
 import flixel.FlxObject;
@@ -156,6 +160,9 @@ class PlayState extends MusicBeatState
 	public var gf:Character = null;
 	public var boyfriend:Character = null;
 
+	var notePool:NotePool;
+	var _asyncPreloadTriggered:Bool = false;
+
 	public var notes:FlxTypedGroup<Note>;
 	public var unspawnNotes:Array<Note> = [];
 	public var eventNotes:Array<EventNote> = [];
@@ -278,6 +285,7 @@ class PlayState extends MusicBeatState
 		PauseSubState.songName = null; //Reset to default
 		playbackRate = ClientPrefs.getGameplaySetting('songspeed');
 
+		
 		keysArray = [
 			'note_left',
 			'note_down',
@@ -377,6 +385,14 @@ class PlayState extends MusicBeatState
 		boyfriendGroup = new FlxSpriteGroup(BF_X, BF_Y);
 		dadGroup = new FlxSpriteGroup(DAD_X, DAD_Y);
 		gfGroup = new FlxSpriteGroup(GF_X, GF_Y);
+
+		// NotePool
+		notePool = new NotePool(64, 256);
+
+		// CacheManager WIP
+		CacheManager.pin("shared/notes");
+		CacheManager.pin("shared/ui");
+		CacheManager.pin("shared/healthBar");
 
 		switch (curStage)
 		{
@@ -1086,9 +1102,8 @@ class PlayState extends MusicBeatState
 				daNote.visible = false;
 				daNote.ignoreNote = true;
 
-				daNote.kill();
 				unspawnNotes.remove(daNote);
-				daNote.destroy();
+				notePool.recycle(daNote);
 			}
 			--i;
 		}
@@ -1332,7 +1347,7 @@ class PlayState extends MusicBeatState
 				else
 					oldNote = null;
 
-				var swagNote:Note = new Note(daStrumTime, daNoteData, oldNote);
+				var swagNote:Note = notePool.get(daStrumTime, daNoteData, oldNote);
 				swagNote.mustPress = gottaHitNote;
 				swagNote.sustainLength = songNotes[2];
 				swagNote.gfNote = (section.gfSection && (songNotes[1]<4));
@@ -1351,7 +1366,7 @@ class PlayState extends MusicBeatState
 					{
 						oldNote = unspawnNotes[Std.int(unspawnNotes.length - 1)];
 
-						var sustainNote:Note = new Note(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true);
+						var sustainNote:Note = notePool.get(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true);
 						sustainNote.mustPress = gottaHitNote;
 						sustainNote.gfNote = (section.gfSection && (songNotes[1]<4));
 						sustainNote.noteType = swagNote.noteType;
@@ -1626,6 +1641,8 @@ class PlayState extends MusicBeatState
 
 	override public function update(elapsed:Float)
 	{
+		CacheManager.update(elapsed);
+
 		if(!inCutscene && !paused && !freezeCamera) {
 			FlxG.camera.followLerp = 2.4 * cameraSpeed * playbackRate;
 			if(!startingSong && !endingSong && boyfriend.getAnimationName().startsWith('idle')) {
@@ -1686,6 +1703,15 @@ class PlayState extends MusicBeatState
 		{
 			var curTime:Float = Math.max(0, Conductor.songPosition - ClientPrefs.data.noteOffset);
 			songPercent = (curTime / songLength);
+
+			if (!_asyncPreloadTriggered && songPercent >= 0.5 && isStoryMode && storyPlaylist.length > 1)
+			{
+				_asyncPreloadTriggered = true;
+				var nextSong:String = storyPlaylist[1];
+				var diff:String = Difficulty.getFilePath();
+				AsyncSongLoader.preload(nextSong, diff);
+				#if debug trace('[PlayState] Запущена предзагрузка: $nextSong'); #end
+			}
 
 			var songCalc:Float = (songLength - curTime);
 			if(ClientPrefs.data.timeBarType == 'Time Elapsed') songCalc = curTime;
@@ -1801,6 +1827,17 @@ class PlayState extends MusicBeatState
 				setSongTime(Conductor.songPosition + 10000);
 				clearNotesBefore(Conductor.songPosition);
 			}
+			if(FlxG.keys.justPressed.F3)
+			{
+				trace('=== LOCAL ENGINE DEBUG ===');
+				trace(LocalEngineVersion.FULL_STRING);
+				trace(notePool.getStats());
+				trace(AsyncSongLoader.getStats());
+				trace('Song progress: ' + Math.round(songPercent * 100) + '%');
+				trace('Memory: ' + Math.round(openfl.system.System.totalMemory / 1024 / 1024) + 'MB');
+				trace('=========================');
+			}
+			if(FlxG.keys.justPressed.F4) trace(CacheManager.getStats());
 		}
 		#end
 
@@ -2385,6 +2422,7 @@ class PlayState extends MusicBeatState
 				Mods.loadTopMod();
 				#if DISCORD_ALLOWED DiscordClient.resetClientID(); #end
 
+				AsyncSongLoader.clear();
 				MusicBeatState.switchState(new FreeplayState());
 				FlxG.sound.playMusic(Paths.music('freakyMenu'));
 				changedDifficulty = false;
@@ -2995,9 +3033,8 @@ class PlayState extends MusicBeatState
 	}
 
 	public function invalidateNote(note:Note):Void {
-		note.kill();
 		notes.remove(note, true);
-		note.destroy();
+		notePool.recycle(note);
 	}
 
 	public function spawnNoteSplashOnNote(note:Note) {
@@ -3043,6 +3080,9 @@ class PlayState extends MusicBeatState
 		#if FLX_PITCH FlxG.sound.music.pitch = 1; #end
 		Note.globalRgbShaders = [];
 		backend.NoteTypesConfig.clearNoteTypesData();
+
+		if (notePool != null) { notePool.destroy(); notePool = null; }
+
 		instance = null;
 		super.destroy();
 	}

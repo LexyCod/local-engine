@@ -4,6 +4,9 @@ import flixel.FlxG;
 import openfl.text.TextField;
 import openfl.text.TextFormat;
 import openfl.system.System;
+import backend.LocalEngineVersion;
+import backend.AsyncSongLoader;
+import states.PlayState;
 
 /**
 	The FPS class provides an easy-to-use monitor to display
@@ -43,6 +46,8 @@ class FPSCounter extends TextField
 
 	var deltaTimeout:Float = 0.0;
 
+	static var _versionLine:String = null;
+
 	// Event Handlers
 	private override function __enterFrame(deltaTime:Float):Void
 	{
@@ -62,12 +67,34 @@ class FPSCounter extends TextField
 	}
 
 	public dynamic function updateText():Void { // so people can override it in hscript
-		text = 'FPS: ${currentFPS}'
-		+ '\nMemory: ${flixel.util.FlxStringUtil.formatBytes(memoryMegas)}';
+		if (_versionLine == null)
+			_versionLine = LocalEngineVersion.SHORT_STRING;
 
+		var out:String = 'FPS: ${currentFPS}'
+			+ ' - Memory: ' + flixel.util.FlxStringUtil.formatBytes(memoryMegas);
+
+		out += '\n' + _versionLine;
+
+		if (PlayState.instance != null && PlayState.isStoryMode)
+		{
+			var playlist = PlayState.storyPlaylist;
+			if (playlist != null && playlist.length > 1)
+			{
+				var nextSong:String = playlist[1];
+				var status:String = AsyncSongLoader.getStatus(nextSong, Difficulty.getFilePath());
+				out += '\nNext: ' + nextSong + ' [' + status + ']';
+			}
+		}
+
+		var memMB:Float = memoryMegas / 1024 / 1024;
+		if (memMB > 900) out += '\n⚠ HIGH MEMORY';
+
+		text = out;
 		textColor = 0xFFFFFFFF;
 		if (currentFPS < FlxG.drawFramerate * 0.5)
 			textColor = 0xFFFF0000;
+		else if (memMB > 900)
+			textColor = 0xFFFF8800;
 	}
 
 	inline function get_memoryMegas():Float
