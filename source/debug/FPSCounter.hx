@@ -121,12 +121,12 @@ class FPSCounter extends TextField
 
 		_commitPanel =
 			  '──── Last Commit ────────────────'
-			+ '\nCommit(full):    ' + LocalEngineVersion.GIT_HASH_FULL
-			+ '\nBranch:  ' + LocalEngineVersion.GIT_BRANCH
-			+ '\nAuthor:  ' + LocalEngineVersion.GIT_AUTHOR
-			+ '\nDate:    ' + LocalEngineVersion.GIT_DATE
+			+ '\nCommit(full): ' + LocalEngineVersion.GIT_HASH_FULL
+			+ '\nBranch: ' + LocalEngineVersion.GIT_BRANCH
+			+ '\nAuthor: ' + LocalEngineVersion.GIT_AUTHOR
+			+ '\nDate: ' + LocalEngineVersion.GIT_DATE
 			+ '\nDescription: ' + LocalEngineVersion.GIT_MESSAGE
-			+ '\nStats:   ' + LocalEngineVersion.GIT_STATS
+			+ '\nStats: dc' + LocalEngineVersion.GIT_STATS
 			+ '\nChanged files:'
 			+ '\n' + fileList
 			+ '\n─────────────────────────────────';
