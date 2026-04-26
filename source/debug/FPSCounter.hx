@@ -8,23 +8,20 @@ import backend.LocalEngineVersion;
 import backend.AsyncSongLoader;
 import states.PlayState;
 
-/**
-	The FPS class provides an easy-to-use monitor to display
-	the current frame rate of an OpenFL project
-**/
 class FPSCounter extends TextField
 {
-	/**
-		The current frame rate, expressed using frames-per-second
-	**/
 	public var currentFPS(default, null):Int;
 
-	/**
-		The current memory usage (WARNING: this is NOT your total program memory usage, rather it shows the garbage collector memory)
-	**/
 	public var memoryMegas(get, never):Float;
 
 	@:noCompletion private var times:Array<Float>;
+
+	static var _shortInfo:String   = null;
+	static var _commitPanel:String = null;
+
+	var _showCommitPanel:Bool = false;
+
+	var deltaTimeout:Float = 0.0;
 
 	public function new(x:Float = 10, y:Float = 10, color:Int = 0x000000)
 	{
@@ -34,24 +31,18 @@ class FPSCounter extends TextField
 		this.y = y;
 
 		currentFPS = 0;
-		selectable = false;
-		mouseEnabled = false;
+		selectable    = false;
+		mouseEnabled  = false;
 		defaultTextFormat = new TextFormat("_sans", 14, color);
-		autoSize = LEFT;
+		autoSize  = LEFT;
 		multiline = true;
-		text = "FPS: ";
+		text      = "FPS: ";
 
 		times = [];
 	}
 
-	var deltaTimeout:Float = 0.0;
-
-	static var _versionLine:String = null;
-
-	// Event Handlers
 	private override function __enterFrame(deltaTime:Float):Void
 	{
-		// prevents the overlay from updating every frame, why would you need to anyways
 		if (deltaTimeout > 1000) {
 			deltaTimeout = 0.0;
 			return;
@@ -61,37 +52,56 @@ class FPSCounter extends TextField
 		times.push(now);
 		while (times[0] < now - 1000) times.shift();
 
-		currentFPS = times.length < FlxG.updateFramerate ? times.length : FlxG.updateFramerate;		
+		currentFPS = times.length < FlxG.updateFramerate ? times.length : FlxG.updateFramerate;
+
+		#if debug
+		if (FlxG.keys.justPressed.TAB)
+			_showCommitPanel = !_showCommitPanel;
+		#end
+
 		updateText();
 		deltaTimeout += deltaTime;
 	}
 
-	public dynamic function updateText():Void { // so people can override it in hscript
-		if (_versionLine == null)
-			_versionLine = LocalEngineVersion.SHORT_STRING;
+	public dynamic function updateText():Void
+	{
+		if (_shortInfo == null)
+			_shortInfo = LocalEngineVersion.SHORT_STRING;
 
-		var out:String = 'FPS: ${currentFPS}'
-			+ ' - Memory: ' + flixel.util.FlxStringUtil.formatBytes(memoryMegas);
+		var memBytes:Float = memoryMegas;
+		var memStr:String  = flixel.util.FlxStringUtil.formatBytes(memBytes);
+		var memMB:Float    = memBytes / 1024 / 1024;
 
-		out += '\n' + _versionLine;
+		var out:String = 'FPS: $currentFPS'
+			+ '\nMemory: $memStr'
+			+ '\n$_shortInfo';
 
-		#if debug
 		if (PlayState.instance != null && PlayState.isStoryMode)
 		{
 			var playlist = PlayState.storyPlaylist;
 			if (playlist != null && playlist.length > 1)
 			{
-				var nextSong:String = playlist[1];
-				var status:String = AsyncSongLoader.getStatus(nextSong, Difficulty.getFilePath());
-				out += '\nNext: ' + nextSong + ' [' + status + ']';
+				var nextSong = playlist[1];
+				var status   = AsyncSongLoader.getStatus(nextSong, Difficulty.getFilePath());
+				out += '\nNext: $nextSong [$status]';
 			}
+		}
+
+		if (memMB > 900) out += '\n\u26A0 HIGH MEMORY';
+
+		#if debug
+		if (_showCommitPanel)
+		{
+			if (_commitPanel == null) _buildCommitPanel();
+			out += '\n' + _commitPanel;
+		}
+		else
+		{
+			out += '\n[Tab] commit info';
 		}
 		#end
 
-		var memMB:Float = memoryMegas / 1024 / 1024;
-		if (memMB > 900) out += '\n⚠ HIGH MEMORY';
-
-		text = out;
+		text      = out;
 		textColor = 0xFFFFFFFF;
 		if (currentFPS < FlxG.drawFramerate * 0.5)
 			textColor = 0xFFFF0000;
@@ -99,6 +109,55 @@ class FPSCounter extends TextField
 			textColor = 0xFFFF8800;
 	}
 
-	inline function get_memoryMegas():Float
+	#if debug
+	static function _buildCommitPanel():Void
+	{
+		var rawFiles  = LocalEngineVersion.GIT_CHANGED_FILES;
+		var fileLines = rawFiles.split('\n');
+		var fileList  = fileLines.map(f -> {
+			var parts = f.split('/');
+			return '  • ' + parts[parts.length - 1];
+		}).join('\n');
+
+		_commitPanel =
+			  '──── Last Commit ────────────────'
+			+ '\nCommit(full):    ' + LocalEngineVersion.GIT_HASH_FULL
+			+ '\nBranch:  ' + LocalEngineVersion.GIT_BRANCH
+			+ '\nAuthor:  ' + LocalEngineVersion.GIT_AUTHOR
+			+ '\nDate:    ' + LocalEngineVersion.GIT_DATE
+			+ '\nDescription: ' + LocalEngineVersion.GIT_MESSAGE
+			+ '\nStats:   ' + LocalEngineVersion.GIT_STATS
+			+ '\nChanged files:'
+			+ '\n' + fileList
+			+ '\n─────────────────────────────────';
+	}
+	#end
+
+	function get_memoryMegas():Float
+	{
+		#if cpp
+		return _getNativeMemory();
+		#else
 		return cast(System.totalMemory, UInt);
+		#end
+	}
+
+	#if cpp
+	@:noCompletion
+	static function _getNativeMemory():Float
+	{
+		#if !windows
+		try {
+			var status = sys.io.File.getContent('/proc/self/status');
+			var reg = new EReg('VmRSS:\\s*(\\d+)\\s*kB', '');
+			if (reg.match(status))
+				return Std.parseFloat(reg.matched(1)) * 1024;
+		} catch(e:Dynamic) {}
+		#end
+
+		var gcMem:Float  = cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_USAGE);
+		var sysMem:Float = cast(System.totalMemory, UInt);
+		return gcMem; // + sysMem варивант странно этот работает порчемуто
+	}
+	#end
 }
