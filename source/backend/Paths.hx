@@ -21,6 +21,7 @@ import haxe.Json;
 #if MODS_ALLOWED
 import backend.Mods;
 #end
+import backend.CacheManager;
 
 class Paths
 {
@@ -283,6 +284,7 @@ class Paths
 		newGraphic.persist = true;
 		newGraphic.destroyOnNoUse = false;
 		currentTrackedAssets.set(file, newGraphic);
+		CacheManager.onTextureLoaded(file, newGraphic);
 		return newGraphic;
 	}
 

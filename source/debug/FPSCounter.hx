@@ -75,6 +75,7 @@ class FPSCounter extends TextField
 
 		out += '\n' + _versionLine;
 
+		#if debug
 		if (PlayState.instance != null && PlayState.isStoryMode)
 		{
 			var playlist = PlayState.storyPlaylist;
@@ -85,6 +86,7 @@ class FPSCounter extends TextField
 				out += '\nNext: ' + nextSong + ' [' + status + ']';
 			}
 		}
+		#end
 
 		var memMB:Float = memoryMegas / 1024 / 1024;
 		if (memMB > 900) out += '\n⚠ HIGH MEMORY';
