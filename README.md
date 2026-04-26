@@ -1,5 +1,6 @@
 # Friday Night Funkin' - Local Engine
 based on Psych engine
+<img width="326" height="212" alt="1" src="https://github.com/user-attachments/assets/cb228973-823e-4dd7-a7ef-dd9cf470233d" />
 
 ## Installation:
 
