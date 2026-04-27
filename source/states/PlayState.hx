@@ -175,6 +175,14 @@ class PlayState extends MusicBeatState
 	public var playerStrums:FlxTypedGroup<StrumNote>;
 	public var grpNoteSplashes:FlxTypedGroup<NoteSplash>;
 
+	private var camTargetX:Float = 0;
+	private var camTargetY:Float = 0;
+	private var camMoveLerp:Float = 5.0;
+
+	private var targetCamAngle:Float = 0.0;
+	private var camAngleLerp:Float = 8.0;
+	private var camAngleSpeed:Float = 12.0;
+
 	public var camZooming:Bool = false;
 	public var camZoomingMult:Float = 1;
 	public var camZoomingDecay:Float = 1;
@@ -528,6 +536,8 @@ class PlayState extends MusicBeatState
 		noteGroup.add(grpNoteSplashes);
 
 		camFollow = new FlxObject(0, 0, 1, 1);
+		camTargetX = camFollow.x;
+		camTargetY = camFollow.y;
 		camFollow.setPosition(camPos.x, camPos.y);
 		camPos.put();
 
@@ -961,6 +971,7 @@ class PlayState extends MusicBeatState
 			return false;
 		}
 
+		camGame.angle = 0;
 		seenCutscene = true;
 		inCutscene = false;
 		var ret:Dynamic = callOnScripts('onStartCountdown', null, true);
@@ -1226,6 +1237,7 @@ class PlayState extends MusicBeatState
 	function startSong():Void
 	{
 		startingSong = false;
+		camGame.angle = 0;
 
 		@:privateAccess
 		FlxG.sound.playMusic(inst._sound, 1, false);
@@ -1657,6 +1669,19 @@ class PlayState extends MusicBeatState
 		else FlxG.camera.followLerp = 0;
 		callOnScripts('onUpdate', [elapsed]);
 
+		if (camFollow != null && !isCameraOnForcedPos) {
+			var lerpVal:Float = Math.min(1, camMoveLerp * elapsed * playbackRate);
+			camFollow.x += (camTargetX - camFollow.x) * lerpVal;
+			camFollow.y += (camTargetY - camFollow.y) * lerpVal;
+		}
+
+		if (camGame != null) {
+			var aLerp:Float = Math.min(1, camAngleSpeed * elapsed * playbackRate);
+			camGame.angle += (targetCamAngle - camGame.angle) * aLerp;
+
+			//camGame.angle = FlxMath.lerp(0, camGame.angle, Math.exp(-camAngleLerp * elapsed * playbackRate));
+		}
+
 		super.update(elapsed);
 
 		setOnScripts('curDecStep', curDecStep);
@@ -1887,6 +1912,8 @@ class PlayState extends MusicBeatState
 
 	function openPauseMenu()
 	{
+		targetCamAngle = 0;
+		camGame.angle = 0;
 		FlxG.camera.followLerp = 0;
 		persistentUpdate = false;
 		persistentDraw = true;
@@ -2080,8 +2107,8 @@ class PlayState extends MusicBeatState
 						isCameraOnForcedPos = true;
 						if(flValue1 == null) flValue1 = 0;
 						if(flValue2 == null) flValue2 = 0;
-						camFollow.x = flValue1;
-						camFollow.y = flValue2;
+						camTargetX = camFollow.x = flValue1;
+						camTargetY = camFollow.y = flValue2;
 					}
 				}
 
@@ -2250,9 +2277,8 @@ class PlayState extends MusicBeatState
 
 		if (gf != null && SONG.notes[sec].gfSection)
 		{
-			camFollow.setPosition(gf.getMidpoint().x, gf.getMidpoint().y);
-			camFollow.x += gf.cameraPosition[0] + girlfriendCameraOffset[0];
-			camFollow.y += gf.cameraPosition[1] + girlfriendCameraOffset[1];
+			camTargetX = gf.getMidpoint().x + gf.cameraPosition[0] + girlfriendCameraOffset[0];
+			camTargetY = gf.getMidpoint().y + gf.cameraPosition[1] + girlfriendCameraOffset[1];
 			tweenCamIn();
 			callOnScripts('onMoveCamera', ['gf']);
 			return;
@@ -2268,16 +2294,13 @@ class PlayState extends MusicBeatState
 	{
 		if(isDad)
 		{
-			camFollow.setPosition(dad.getMidpoint().x + 150, dad.getMidpoint().y - 100);
-			camFollow.x += dad.cameraPosition[0] + opponentCameraOffset[0];
-			camFollow.y += dad.cameraPosition[1] + opponentCameraOffset[1];
-			tweenCamIn();
+			camTargetX = dad.getMidpoint().x + 150 + dad.cameraPosition[0] + opponentCameraOffset[0];
+			camTargetY = dad.getMidpoint().y - 100 + dad.cameraPosition[1] + opponentCameraOffset[1];
 		}
 		else
 		{
-			camFollow.setPosition(boyfriend.getMidpoint().x - 100, boyfriend.getMidpoint().y - 100);
-			camFollow.x -= boyfriend.cameraPosition[0] - boyfriendCameraOffset[0];
-			camFollow.y += boyfriend.cameraPosition[1] + boyfriendCameraOffset[1];
+			camTargetX = boyfriend.getMidpoint().x - 100 - boyfriend.cameraPosition[0] + boyfriendCameraOffset[0];
+			camTargetY = boyfriend.getMidpoint().y - 100 + boyfriend.cameraPosition[1] + boyfriendCameraOffset[1];
 
 			if (songName == 'tutorial' && cameraTwn == null && FlxG.camera.zoom != 1)
 			{
@@ -2948,6 +2971,16 @@ class PlayState extends MusicBeatState
 		if (!note.isSustainNote) invalidateNote(note);
 	}
 
+	function getNoteDirAngle(noteData:Int):Float {
+		return switch (noteData) {
+			case 0: -2.5; // left
+			case 1: -1.0; // down
+			case 2: 1.0; // up
+			case 3: 2.5; // right
+			default: 0; // мама габена
+		}
+	}
+
 	public function goodNoteHit(note:Note):Void
 	{
 		if(note.wasGoodHit) return;
@@ -3018,6 +3051,8 @@ class PlayState extends MusicBeatState
 
 		if (!note.isSustainNote)
 		{
+			camGame.angle = getNoteDirAngle(note.noteData);
+
 			combo++;
 			if(combo > 9999) combo = 9999;
 			popUpScore(note);
