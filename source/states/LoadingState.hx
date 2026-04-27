@@ -11,6 +11,8 @@ import lime.utils.AssetLibrary;
 import lime.utils.AssetManifest;
 
 import backend.StageData;
+import backend.SpritePreloader;
+import backend.LocalAtlasTextures;
 
 import haxe.io.Path;
 
@@ -29,6 +31,10 @@ class LoadingState extends MusicBeatState
 	var directory:String;
 	var callbacks:MultiCallback;
 	var targetShit:Float = 0;
+
+	var _preloader:SpritePreloader = null;
+	var _preloadDone:Bool = false;
+	var _preloadProgress:Float = 0;
 
 	function new(target:FlxState, stopMusic:Bool, directory:String)
 	{
@@ -57,6 +63,17 @@ class LoadingState extends MusicBeatState
 		loadBar.screenCenter(X);
 		add(loadBar);
 		
+		_preloader = new SpritePreloader();
+		_preloader.onProgress = function(p) { _preloadProgress = p; };
+		_preloader.onComplete = function() {
+			_preloadDone = true;
+			#if debug trace('[LoadingState] SpritePreloader end'); #end
+		};
+		if (PlayState.SONG != null)
+			_preloader.start(PlayState.SONG.song);
+		else
+			_preloader.startMenuPreload();
+
 		initSongsManifest().onComplete
 		(
 			function (lib)
@@ -119,7 +136,9 @@ class LoadingState extends MusicBeatState
 		}
 
 		if(callbacks != null) {
-			targetShit = FlxMath.remapToRange(callbacks.numRemaining / callbacks.length, 1, 0, 0, 1);
+			var audioProgress = FlxMath.remapToRange(callbacks.numRemaining / callbacks.length, 1, 0, 0, 1);
+			var texProgress   = _preloadProgress;
+			targetShit = (audioProgress + texProgress) * 0.5;
 			loadBar.scale.x += 0.5 * (targetShit - loadBar.scale.x);
 		}
 	}
@@ -158,7 +177,6 @@ class LoadingState extends MusicBeatState
 		Paths.setCurrentLevel(directory);
 		trace('Setting asset folder to ' + directory);
 
-		/*#if NO_PRELOAD_ALL
 		var loaded:Bool = false;
 		if (PlayState.SONG != null) {
 			loaded = isSoundLoaded(getSongPath()) && (!PlayState.SONG.needsVoices || isSoundLoaded(getVocalPath())) && isLibraryLoaded('week_assets');
@@ -166,14 +184,12 @@ class LoadingState extends MusicBeatState
 		
 		if (!loaded)
 			return new LoadingState(target, stopMusic, directory);
-		#end*/
 		if (stopMusic && FlxG.sound.music != null)
 			FlxG.sound.music.stop();
 		
 		return target;
 	}
 	
-	/*#if NO_PRELOAD_ALL
 	static function isSoundLoaded(path:String):Bool
 	{
 		trace(path);
@@ -184,7 +200,7 @@ class LoadingState extends MusicBeatState
 	{
 		return Assets.getLibrary(library) != null;
 	}
-	#end*/
+
 	
 	override function destroy()
 	{
