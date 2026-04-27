@@ -3,6 +3,7 @@ package backend;
 /**
  * Version Info
  * пиздец нахуй
+ * пошло оно все к чертовой матери. Ну или нахуй @ Sergo
  */
 class LocalEngineVersion
 {

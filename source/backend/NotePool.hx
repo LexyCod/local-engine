@@ -14,21 +14,30 @@ import objects.Note;
 class NotePool
 {
 	var _free:Array<Note>   = [];
-
 	var _active:Array<Note> = [];
-
 	var _overflow:Int = 0;
+	final _maxSize:Int;
 
-	var _maxSize:Int;
-
-	public var totalCreated:Int = 0;
-	public var totalReused:Int  = 0;
+	// считать можно, менять напрямую нельзя
+	public var totalCreated(default, null):Int = 0;
+	public var totalReused(default, null):Int = 0;
 
 	public function new(initialSize:Int = 64, maxSize:Int = 256)
 	{
 		_maxSize = maxSize;
-		#if debug
-		trace('[NotePool] Init, max=$maxSize');
+
+		// можно создать пару нот, чтобы не создавать новые во время песни и не тормозить игру
+		for (i in 0...initialSize) {
+			if (i >= _maxSize) break;
+
+			var note:Note = new Note(0, 0, null, false, false, null);
+			note.kill();
+			_free.push(note);
+			totalCreated++;
+		}
+
+		#if (debug || dev)
+		trace('[NotePool] Init: prealloc=$initialSize, max=$maxSize');
 		#end
 	}
 
@@ -47,7 +56,7 @@ class NotePool
 			note = new Note(strumTime, noteData, prevNote, sustainNote, inEditor, createdFrom);
 			totalCreated++;
 			_active.push(note);
-			#if debug
+			#if (debug || dev)
 			trace('[NotePool] Pool expands : note created #$totalCreated');
 			#end
 			return note; // init
@@ -55,7 +64,7 @@ class NotePool
 		else
 		{
 			_overflow++;
-			#if debug
+			#if (debug || dev)
 			trace('[NotePool] WARNING: pool max ($_maxSize), overflow #$_overflow');
 			#end
 			return new Note(strumTime, noteData, prevNote, sustainNote, inEditor, createdFrom);
@@ -66,18 +75,11 @@ class NotePool
 		return note;
 	}
 
-	public function recycle(note:Note):Void
+	public function recycle(note:Note)
 	{
 		if (note == null) return;
+		if (!_active.remove(note)) return;
 
-		var idx = _active.indexOf(note);
-		if (idx == -1)
-		{
-			note.destroy();
-			return;
-		}
-
-		_active.splice(idx, 1);
 		note.kill();
 		_free.push(note);
 	}
@@ -87,15 +89,19 @@ class NotePool
 		while (_active.length > 0)
 		{
 			var note = _active.pop();
-			note.kill();
-			_free.push(note);
+			// вообще хз зачем оно здесь.. но пусть будет для уверенности
+			if (note != null) {
+				note.kill();
+				_free.push(note);
+			}
 		}
 	}
 
 	public function getStats():String
 	{
-		var rate = totalReused + totalCreated > 0
-			? Math.round(totalReused / (totalReused + totalCreated) * 100) : 0;
+		var total = totalReused + totalCreated;
+		var rate = total > 0
+			? Math.round(totalReused / total * 100) : 0;
 		return '[NotePool] Active: ${_active.length} | Free: ${_free.length} | '
 			+ 'Created: $totalCreated | Reused: $totalReused | '
 			+ 'Reused: $rate% | Overflow: $_overflow';
@@ -107,5 +113,9 @@ class NotePool
 		for (note in _free)   note.destroy();
 		_active = [];
 		_free   = [];
+
+		totalCreated = 0;
+		totalReused = 0;
+		_overflow = 0;
 	}
 }

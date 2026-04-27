@@ -21,7 +21,7 @@ class AsyncSongLoader
 
 		if (alreadyLoading)
 		{
-			#if debug trace('[AsyncSongLoader] $key loading Start'); #end
+			#if (debug || dev) trace('[AsyncSongLoader] $key loading Start'); #end
 			return;
 		}
 
@@ -29,7 +29,7 @@ class AsyncSongLoader
 		_states.set(key, Loading);
 		_mutex.release();
 
-		#if debug trace('[AsyncSongLoader] Preload startes: $key'); #end
+		#if (debug || dev) trace('[AsyncSongLoader] Preload startes: $key'); #end
 
 		Thread.create(function()
 		{
@@ -39,7 +39,7 @@ class AsyncSongLoader
 			}
 			catch (e:Dynamic)
 			{
-				#if debug trace('[AsyncSongLoader] Error $key: $e'); #end
+				#if (debug || dev) trace('[AsyncSongLoader] Error $key: $e'); #end
 				_mutex.acquire();
 				_states.set(key, Failed);
 				_mutex.release();
@@ -84,7 +84,7 @@ class AsyncSongLoader
 		_mutex.acquire();
 		_states.clear();
 		_mutex.release();
-		#if debug trace('[AsyncSongLoader] Cash cleared'); #end
+		#if (debug || dev) trace('[AsyncSongLoader] Cash cleared'); #end
 	}
 
 	public static function getStats():String
@@ -138,7 +138,7 @@ class AsyncSongLoader
 		_states.set(key, Ready);
 		_mutex.release();
 
-		#if debug trace('[AsyncSongLoader]  $key ready'); #end
+		#if (debug || dev) trace('[AsyncSongLoader]  $key ready'); #end
 	}
 }
 

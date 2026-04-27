@@ -334,13 +334,10 @@ class Note extends FlxSprite
 		this.noteData = noteData;
 
 		if(noteData > -1) {
-			texture = ''; // reloadNote — текстура из кэша, не с диска
-			// rgbShader уже создан при первом new Note(), просто обновляем parent
-			if (rgbShader == null)
-				rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
-			else
-				rgbShader.parent = initializeGlobalRGBShader(noteData);
-			if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
+			texture = '';
+			// вместо проверки и смены парент просто создаем новый шейдер, привязаный который к текущему спрайту (вызываем принудительно)
+			rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
+			if (PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
 
 			x += swagWidth * (noteData);
 			if(!isSustainNote && noteData < colArray.length) {
@@ -461,6 +458,8 @@ class Note extends FlxSprite
 		velocity.set(0, 0);
 		acceleration.set(0, 0);
 		clipRect         = null;
+		texture		= null;
+		rgbShader	= null;
 
 		noteSplashData.disabled       = false;
 		noteSplashData.texture        = null;

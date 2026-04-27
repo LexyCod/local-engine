@@ -11,9 +11,8 @@ import states.PlayState;
 class FPSCounter extends TextField
 {
 	public var currentFPS(default, null):Int;
-
 	public var memoryMegas(get, never):Float;
-
+	
 	@:noCompletion private var times:Array<Float>;
 
 	static var _shortInfo:String   = null;
@@ -54,7 +53,7 @@ class FPSCounter extends TextField
 
 		currentFPS = times.length < FlxG.updateFramerate ? times.length : FlxG.updateFramerate;
 
-		#if debug
+		#if (debug || dev)
 		if (FlxG.keys.justPressed.TAB)
 			_showCommitPanel = !_showCommitPanel;
 		#end
@@ -89,7 +88,7 @@ class FPSCounter extends TextField
 
 		if (memMB > 900) out += '\n\u26A0 HIGH MEMORY';
 
-		#if debug
+		#if (debug || dev)
 		if (_showCommitPanel)
 		{
 			if (_commitPanel == null) _buildCommitPanel();
@@ -102,14 +101,10 @@ class FPSCounter extends TextField
 		#end
 
 		text      = out;
-		textColor = 0xFFFFFFFF;
-		if (currentFPS < FlxG.drawFramerate * 0.5)
-			textColor = 0xFFFF0000;
-		else if (memMB > 900)
-			textColor = 0xFFFF8800;
+		textColor = (currentFPS < FlxG.drawFramerate * 0.5) ? 0xFFFF0000 : (memMB > 900 ? 0xFFFF8800 : 0xFFFFFFFF);
 	}
 
-	#if debug
+	#if (debug || dev)
 	static function _buildCommitPanel():Void
 	{
 		var rawFiles  = LocalEngineVersion.GIT_CHANGED_FILES;

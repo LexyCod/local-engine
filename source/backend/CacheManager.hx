@@ -76,20 +76,20 @@ class CacheManager
 				sizeBytes: 0, pinned: true, hitCount: 0
 			};
 		}
-		#if debug trace('[CacheManager] Pinned: $keyOrPrefix ($pinned entries)'); #end
+		#if (debug || dev) trace('[CacheManager] Pinned: $keyOrPrefix ($pinned entries)'); #end
 	}
 
 	public static function evict(key:String):Bool
 	{
 		if (!_entries.exists(key)) return false;
 		var entry = _entries[key];
-		if (entry.pinned) { #if debug trace('[CacheManager] not export pinned: $key'); #end return false; }
+		if (entry.pinned) { #if (debug || dev) trace('[CacheManager] not export pinned: $key'); #end return false; }
 
 		_destroyTexture(key);
 		stats.evictions++;
 		stats.totalEvictedMB += entry.sizeBytes / 1024 / 1024;
 		_entries.remove(key);
-		#if debug trace('[CacheManager] Evicted: $key'); #end
+		#if (debug || dev) trace('[CacheManager] Evicted: $key'); #end
 		return true;
 	}
 
@@ -106,7 +106,7 @@ class CacheManager
 		var currentRAM = getCurrentRAMMB();
 		if (currentRAM < ramThresholdMB) return;
 
-		#if debug trace('[CacheManager] RAM: ${currentRAM}MB > ${ramThresholdMB}MB, LRU...'); #end
+		#if (debug || dev) trace('[CacheManager] RAM: ${currentRAM}MB > ${ramThresholdMB}MB, LRU...'); #end
 
 		var candidates:Array<CacheEntry> = [];
 		for (entry in _entries) if (!entry.pinned) candidates.push(entry);
@@ -127,7 +127,7 @@ class CacheManager
 			count++;
 		}
 
-		#if debug
+		#if (debug || dev)
 		trace('[CacheManager] free ~${Math.round(freedBytes/1024/1024)}MB ($count textures)');
 		#end
 		openfl.system.System.gc();
@@ -142,7 +142,7 @@ class CacheManager
 
 		for (key in toEvict) { _destroyTexture(key); stats.evictions++; _entries.remove(key); }
 		openfl.system.System.gc();
-		#if debug trace('[CacheManager] evictGroup("$groupTag"): ${toEvict.length} textures'); #end
+		#if (debug || dev) trace('[CacheManager] evictGroup("$groupTag"): ${toEvict.length} textures'); #end
 	}
 
 	public static function clear():Void
@@ -150,7 +150,7 @@ class CacheManager
 		var toEvict = [for (key in _entries.keys()) if (!_entries[key].pinned) key];
 		for (key in toEvict) { _destroyTexture(key); stats.evictions++; _entries.remove(key); }
 		openfl.system.System.gc();
-		#if debug trace('[CacheManager] clear(): ${toEvict.length} textures'); #end
+		#if (debug || dev) trace('[CacheManager] clear(): ${toEvict.length} textures'); #end
 	}
 
 	public static function getCurrentRAMMB():Int

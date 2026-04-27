@@ -1710,7 +1710,7 @@ class PlayState extends MusicBeatState
 				var nextSong:String = storyPlaylist[1];
 				var diff:String = Difficulty.getFilePath();
 				AsyncSongLoader.preload(nextSong, diff);
-				#if debug trace('[PlayState] Запущена предзагрузка: $nextSong'); #end
+				#if (debug || dev) trace('[PlayState] Запущена предзагрузка: $nextSong'); #end
 			}
 
 			var songCalc:Float = (songLength - curTime);
@@ -1817,7 +1817,7 @@ class PlayState extends MusicBeatState
 			checkEventNote();
 		}
 
-		#if debug
+		#if (debug || dev)
 		if(!endingSong && !startingSong) {
 			if (FlxG.keys.justPressed.ONE) {
 				KillNotes();
@@ -2631,7 +2631,7 @@ class PlayState extends MusicBeatState
 
 		if (!controls.controllerMode)
 		{
-			#if debug
+			#if (debug || dev)
 			//Prevents crash specifically on debug without needing to try catch shit
 			@:privateAccess if (!FlxG.keys._keyListMap.exists(eventKey)) return;
 			#end

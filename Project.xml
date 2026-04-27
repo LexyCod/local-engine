@@ -43,7 +43,14 @@
 	<!-- ____________________________ Window Settings ___________________________ -->
 
 	<!--These window settings apply to all targets-->
-	<window width="1280" height="720" fps="" background="#000000" hardware="true" vsync="false" />
+	<window
+		width="1280" 
+		height="720"  
+		fps=""
+		background="#000000" 
+		hardware="true" 
+		vsync="false" 
+	/>
 
 	<!--HTML5-specific-->
 	<window if="html5" resizable="true" />
@@ -57,10 +64,19 @@
 	<!--Switch-specific-->
 	<window if="switch" orientation="landscape" fullscreen="true" width="0" height="0" resizable="true" />
 
+	<!-- ______________________ LOCAL ENGINE CUSTOMIZATION ______________________ -->
+
+	<define name="DEV_BUILD" unless="RELEASE_BUILD" />
+	<define name="dev" if="DEV_BUILD" />
+	<undefine name="DEV_BUILD" if="RELEASE_BUILD" />
+
+	<haxeflag name="-D" value="final" if="RELEASE_BUILD" />
+
 	<!-- _____________________________ Path Settings ____________________________ -->
 
 	<set name="BUILD_DIR" value="export/debug" if="debug" />
-	<set name="BUILD_DIR" value="export/release" unless="debug" />
+	<set name="BUILD_DIR" value="export/release" unless="debug || DEV_BUILD" />
+	<set name="BUILD_DIR" value="export/dev" if="DEV_BUILD" unless="debug" />
 	<set name="BUILD_DIR" value="export/32bit" if="32bits" />
 
 	<classpath name="source" />

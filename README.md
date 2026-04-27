@@ -6,6 +6,15 @@ based on Psych engine
 
 Refer to [the Build Instructions](./BUILDING.md)
 
+## Required Verions Libraries:
+* Flixel: 5.8.0
+* Flixel-Addons: 3.2.3
+* Flixel-UI: 2.6.1
+
+
+* Lime: **(currently)**
+* OpenFL: **(currently)**
+
 ## Credits:
 * LexyCod - Main Programmer
 * Sergo - Programmer
