@@ -18,7 +18,6 @@ class NotePool
 	var _overflow:Int = 0;
 	final _maxSize:Int;
 
-	// считать можно, менять напрямую нельзя
 	public var totalCreated(default, null):Int = 0;
 	public var totalReused(default, null):Int = 0;
 
@@ -26,7 +25,6 @@ class NotePool
 	{
 		_maxSize = maxSize;
 
-		// можно создать пару нот, чтобы не создавать новые во время песни и не тормозить игру
 		for (i in 0...initialSize) {
 			if (i >= _maxSize) break;
 
@@ -89,7 +87,6 @@ class NotePool
 		while (_active.length > 0)
 		{
 			var note = _active.pop();
-			// вообще хз зачем оно здесь.. но пусть будет для уверенности
 			if (note != null) {
 				note.kill();
 				_free.push(note);

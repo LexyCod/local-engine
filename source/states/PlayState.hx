@@ -179,9 +179,12 @@ class PlayState extends MusicBeatState
 	private var camTargetY:Float = 0;
 	private var camMoveLerp:Float = 5.0;
 
-	private var targetCamAngle:Float = 0.0;
-	private var camAngleLerp:Float = 8.0;
-	private var camAngleSpeed:Float = 12.0;
+	private var noteCamOffsetX:Float = 0;
+	private var noteCamOffsetY:Float = 0;
+
+	private var playerHitStrength:Float = 6.5;
+	private var oppHitStrength:Float = 5.0;
+	private var camOffsetDecay:Float = 8.0;
 
 	public var camZooming:Bool = false;
 	public var camZoomingMult:Float = 1;
@@ -536,10 +539,11 @@ class PlayState extends MusicBeatState
 		noteGroup.add(grpNoteSplashes);
 
 		camFollow = new FlxObject(0, 0, 1, 1);
-		camTargetX = camFollow.x;
-		camTargetY = camFollow.y;
 		camFollow.setPosition(camPos.x, camPos.y);
 		camPos.put();
+
+		camTargetX = camFollow.x;
+		camTargetY = camFollow.y;
 
 		if (prevCamFollow != null)
 		{
@@ -971,7 +975,8 @@ class PlayState extends MusicBeatState
 			return false;
 		}
 
-		camGame.angle = 0;
+		noteCamOffsetX = 0;
+		noteCamOffsetY = 0;
 		seenCutscene = true;
 		inCutscene = false;
 		var ret:Dynamic = callOnScripts('onStartCountdown', null, true);
@@ -1237,7 +1242,8 @@ class PlayState extends MusicBeatState
 	function startSong():Void
 	{
 		startingSong = false;
-		camGame.angle = 0;
+		noteCamOffsetX = 0;
+		noteCamOffsetY = 0;
 
 		@:privateAccess
 		FlxG.sound.playMusic(inst._sound, 1, false);
@@ -1675,11 +1681,17 @@ class PlayState extends MusicBeatState
 			camFollow.y += (camTargetY - camFollow.y) * lerpVal;
 		}
 
-		if (camGame != null) {
-			var aLerp:Float = Math.min(1, camAngleSpeed * elapsed * playbackRate);
-			camGame.angle += (targetCamAngle - camGame.angle) * aLerp;
+		if (camFollow != null) {
+			camFollow.x += noteCamOffsetX;
+			camFollow.y += noteCamOffsetY;
 
-			//camGame.angle = FlxMath.lerp(0, camGame.angle, Math.exp(-camAngleLerp * elapsed * playbackRate));
+			var decay = Math.min(1, camOffsetDecay * elapsed * playbackRate);
+			noteCamOffsetX += (0 - noteCamOffsetX) * decay;
+			noteCamOffsetY += (0 - noteCamOffsetY) * decay;
+
+			final maxOffset = 20.0;
+			noteCamOffsetX = FlxMath.bound(noteCamOffsetX, -maxOffset, maxOffset);
+			noteCamOffsetY = FlxMath.bound(noteCamOffsetY, -maxOffset, maxOffset);
 		}
 
 		super.update(elapsed);
@@ -1912,8 +1924,8 @@ class PlayState extends MusicBeatState
 
 	function openPauseMenu()
 	{
-		targetCamAngle = 0;
-		camGame.angle = 0;
+		noteCamOffsetX = 0;
+		noteCamOffsetY = 0;
 		FlxG.camera.followLerp = 0;
 		persistentUpdate = false;
 		persistentDraw = true;
@@ -2968,16 +2980,24 @@ class PlayState extends MusicBeatState
 		var result:Dynamic = callOnLuas('opponentNoteHit', [notes.members.indexOf(note), Math.abs(note.noteData), note.noteType, note.isSustainNote]);
 		if(result != LuaUtils.Function_Stop && result != LuaUtils.Function_StopHScript && result != LuaUtils.Function_StopAll) callOnHScript('opponentNoteHit', [note]);
 
-		if (!note.isSustainNote) invalidateNote(note);
+		if (!note.isSustainNote) {
+			invalidateNote(note);
+
+			var pt = getNoteDirOffset(note.noteData, true);
+			noteCamOffsetX += pt.x;
+			noteCamOffsetY += pt.y;
+			pt.put();
+		}
 	}
 
-	function getNoteDirAngle(noteData:Int):Float {
+	private function getNoteDirOffset(noteData:Int, isOpp:Bool = false):FlxPoint {
+		var s = isOpp ? oppHitStrength : playerHitStrength;
 		return switch (noteData) {
-			case 0: -2.5; // left
-			case 1: -1.0; // down
-			case 2: 1.0; // up
-			case 3: 2.5; // right
-			default: 0; // мама габена
+			case 0: FlxPoint.get(-s, 0); // left
+			case 1: FlxPoint.get(0, -s*0.6); // down
+			case 2: FlxPoint.get(0, s*0.6); // up
+			case 3: FlxPoint.get(s, 0); // right
+			default: FlxPoint.get(0, 0); // мама габена
 		}
 	}
 
@@ -3051,7 +3071,10 @@ class PlayState extends MusicBeatState
 
 		if (!note.isSustainNote)
 		{
-			camGame.angle = getNoteDirAngle(note.noteData);
+			var pt = getNoteDirOffset(note.noteData, false);
+			noteCamOffsetX += pt.x;
+			noteCamOffsetY += pt.y;
+			pt.put();
 
 			combo++;
 			if(combo > 9999) combo = 9999;
