@@ -22,6 +22,7 @@ import haxe.Json;
 import backend.Mods;
 #end
 import backend.CacheManager;
+import backend.ZipModManager;
 
 class Paths
 {
@@ -31,6 +32,23 @@ class Paths
 	public static function excludeAsset(key:String) {
 		if (!dumpExclusions.contains(key))
 			dumpExclusions.push(key);
+	}
+
+	static function extractZipModPath(key:String):Dynamic {
+		if (key.indexOf('mods/') == 0) {
+			var huina = key.substr(5);
+			var parts = huina.split('/');
+			var modName = parts[0];
+
+			if (modName!=''&&Mods.getModDirectories().contains(modName)) {
+				var modDir = Paths.mods(modName);
+				if (!FileSystem.exists(modDir) || !FileSystem.isDirectory(modDir)) {
+					var inner = huina.substr(modName.length + 1);
+					return {modName: modName, innerPath: inner};
+				}
+			}
+		}
+		return null;
 	}
 
 	public static var dumpExclusions:Array<String> = ['assets/shared/music/freakyMenu.$SOUND_EXT'];
@@ -292,6 +310,12 @@ class Paths
 	{
 		#if sys
 		#if MODS_ALLOWED
+		if (!ignoreMods) {
+			var zipInfo = extractZipModPath(key);
+			if (zipInfo != null && ZipModManager.exists(zipInfo.modName, zipInfo.innerPath)) {
+				return ZipModManager.getText(zipInfo.modName, zipInfo.innerPath);
+			}
+		}
 		if (!ignoreMods && FileSystem.exists(modFolders(key)))
 			return File.getContent(modFolders(key));
 		#end
