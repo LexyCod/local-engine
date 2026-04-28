@@ -22,7 +22,7 @@ import haxe.Json;
 import backend.Mods;
 #end
 import backend.CacheManager;
-import backend.ZipModManager;
+//import backend.ZipModManager;
 
 class Paths
 {
@@ -34,6 +34,7 @@ class Paths
 			dumpExclusions.push(key);
 	}
 
+	/*
 	static function extractZipModPath(key:String):Dynamic {
 		if (key.indexOf('mods/') == 0) {
 			var huina = key.substr(5);
@@ -50,6 +51,7 @@ class Paths
 		}
 		return null;
 	}
+	*/
 
 	public static var dumpExclusions:Array<String> = ['assets/shared/music/freakyMenu.$SOUND_EXT'];
 	/// haya I love you for the base cache dump I took to the max
@@ -310,12 +312,14 @@ class Paths
 	{
 		#if sys
 		#if MODS_ALLOWED
+		/*
 		if (!ignoreMods) {
 			var zipInfo = extractZipModPath(key);
 			if (zipInfo != null && ZipModManager.exists(zipInfo.modName, zipInfo.innerPath)) {
 				return ZipModManager.getText(zipInfo.modName, zipInfo.innerPath);
 			}
 		}
+		*/
 		if (!ignoreMods && FileSystem.exists(modFolders(key)))
 			return File.getContent(modFolders(key));
 		#end

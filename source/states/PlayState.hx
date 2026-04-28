@@ -2994,8 +2994,8 @@ class PlayState extends MusicBeatState
 		var s = isOpp ? oppHitStrength : playerHitStrength;
 		return switch (noteData) {
 			case 0: FlxPoint.get(-s, 0); // left
-			case 1: FlxPoint.get(0, -s*0.6); // down
-			case 2: FlxPoint.get(0, s*0.6); // up
+			case 1: FlxPoint.get(0, s*0.6); // down
+			case 2: FlxPoint.get(0, -s*0.6); // up
 			case 3: FlxPoint.get(s, 0); // right
 			default: FlxPoint.get(0, 0); // мама габена
 		}
