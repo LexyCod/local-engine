@@ -126,9 +126,7 @@ class Note extends FlxSprite
 	public var hitsoundChartEditor:Bool = true;
 	public var hitsound:String = 'hitsound';
 
-	// ─── LOCAL ENGINE: NotePool support ──────────────────────────────────────────
-	private var _poolOwned:Bool = false; // true = нота из пула, false = создана напрямую
-	// ─────────────────────────────────────────────────────────────────────────────
+	private var _poolOwned:Bool = false;
 
 	private function set_multSpeed(value:Float):Float {
 		resizeByRatio(value / multSpeed);
@@ -155,7 +153,7 @@ class Note extends FlxSprite
 
 	public function defaultRGB()
 	{
-		if (rgbShader == null) return; // LOCAL ENGINE: guard
+		if (rgbShader == null) return;
 		var arr:Array<FlxColor> = ClientPrefs.data.arrowRGB[noteData];
 		if(PlayState.isPixelStage) arr = ClientPrefs.data.arrowRGBPixel[noteData];
 
@@ -304,16 +302,10 @@ class Note extends FlxSprite
 		x += offsetX;
 	}
 
-	/**
-	 * LOCAL ENGINE: reinit() — переиспользование ноты из пула.
-	 * Полностью повторяет логику конструктора без super()/new Animation.
-	 * PlayState вызывает это вместо new Note() когда берёт ноту из пула.
-	 */
 	public function reinit(strumTime:Float, noteData:Int, ?prevNote:Note, ?sustainNote:Bool = false, ?inEditor:Bool = false, ?createdFrom:Dynamic = null):Void
 	{
 		if(createdFrom == null) createdFrom = PlayState.instance;
 
-		// Сброс всех полей
 		_resetGameplayFields();
 
 		if (prevNote == null) prevNote = this;
@@ -321,9 +313,7 @@ class Note extends FlxSprite
 		this.prevNote = prevNote;
 		isSustainNote = sustainNote;
 		this.inEditor = inEditor;
-		// moves уже false
 
-		// Позиционирование — точно как в конструкторе
 		x = 0;
 		x += (ClientPrefs.data.middleScroll ? PlayState.STRUM_X_MIDDLESCROLL : PlayState.STRUM_X) + 50;
 		y = 0;
@@ -334,10 +324,13 @@ class Note extends FlxSprite
 		this.noteData = noteData;
 
 		if(noteData > -1) {
-			texture = '';
-			// вместо проверки и смены парент просто создаем новый шейдер, привязаный который к текущему спрайту (вызываем принудительно)
-			rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
-			if (PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
+			reloadNote(texture);
+			if (frames == null) reloadNote('');
+			if (rgbShader == null)
+				rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
+			else
+				rgbShader.parent = initializeGlobalRGBShader(noteData);
+			if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
 
 			x += swagWidth * (noteData);
 			if(!isSustainNote && noteData < colArray.length) {
@@ -395,7 +388,6 @@ class Note extends FlxSprite
 
 	private function _resetGameplayFields():Void
 	{
-		// Разрываем старые связи
 		if (this.prevNote != null && this.prevNote != this) this.prevNote.nextNote = null;
 		if (this.nextNote != null) this.nextNote.prevNote = null;
 
@@ -413,7 +405,7 @@ class Note extends FlxSprite
 		blockHit         = false;
 		sustainLength    = 0;
 		isSustainNote    = false;
-		@:bypassAccessor noteType = null; // bypass set_noteType — rgbShader может быть null
+		@:bypassAccessor noteType = null;
 		prevNote         = null;
 		nextNote         = null;
 		parent           = null;
@@ -430,7 +422,7 @@ class Note extends FlxSprite
 		hitsound         = 'hitsound';
 		hitsoundChartEditor = true;
 		multAlpha        = 1;
-		@:bypassAccessor multSpeed = 1; // bypass set_multSpeed — animation может быть null
+		@:bypassAccessor multSpeed = 1;
 		copyX            = true;
 		copyY            = true;
 		copyAngle        = true;
@@ -458,8 +450,6 @@ class Note extends FlxSprite
 		velocity.set(0, 0);
 		acceleration.set(0, 0);
 		clipRect         = null;
-		texture		= null;
-		rgbShader	= null;
 
 		noteSplashData.disabled       = false;
 		noteSplashData.texture        = null;
@@ -543,12 +533,20 @@ class Note extends FlxSprite
 				offsetX -= _lastNoteOffX;
 			}
 		} else {
-			frames = Paths.getSparrowAtlas(skin);
-			loadNoteAnims();
-			if(!isSustainNote)
+			var atlas = Paths.getSparrowAtlas(skin);
+			if (atlas == null)
 			{
-				centerOffsets();
-				centerOrigin();
+				atlas = Paths.getSparrowAtlas(defaultNoteSkin);
+			}
+			frames = atlas;
+			if (frames != null)
+			{
+				loadNoteAnims();
+				if(!isSustainNote)
+				{
+					centerOffsets();
+					centerOrigin();
+				}
 			}
 		}
 

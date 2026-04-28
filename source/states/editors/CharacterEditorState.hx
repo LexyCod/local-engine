@@ -257,12 +257,13 @@ class CharacterEditorState extends MusicBeatState
 		var tabs = [
 			{name: 'Character', label: 'Character'},
 			{name: 'Animations', label: 'Animations'},
+			{name: 'NoteLoops', label: 'Note Loops'},
 		];
 		UI_characterbox = new FlxUITabMenu(null, tabs, true);
 		UI_characterbox.cameras = [camHUD];
 
-		UI_characterbox.resize(350, 280);
-		UI_characterbox.x = UI_box.x - 100;
+		UI_characterbox.resize(400, 330);
+		UI_characterbox.x = UI_box.x - 150;
 		UI_characterbox.y = UI_box.y + UI_box.height;
 		UI_characterbox.scrollFactor.set();
 		add(UI_characterbox);
@@ -272,6 +273,7 @@ class CharacterEditorState extends MusicBeatState
 		addSettingsUI();
 		addAnimationsUI();
 		addCharacterUI();
+		addNoteLoopsUI();
 
 		UI_box.selected_tab_id = 'Settings';
 		UI_characterbox.selected_tab_id = 'Character';
@@ -595,6 +597,15 @@ class CharacterEditorState extends MusicBeatState
 		UI_characterbox.addGroup(tab_group);
 	}
 
+	var noteLoopsAnimDropDown:FlxUIDropDownMenu;
+	var noteLoopsHoldTypeDropDown:FlxUIDropDownMenu;
+	var noteLoopsStaticFrameStepper:FlxUINumericStepper;
+	var noteLoopsLoopStartStepper:FlxUINumericStepper;
+	var noteLoopsLoopEndStepper:FlxUINumericStepper;
+	var noteLoopsEndAnimInputText:FlxUIInputText;
+	var noteLoopsPreviewBtn:FlxButton;
+	var _noteLoopsCurAnim:AnimArray = null;
+
 	var imageInputText:FlxUIInputText;
 	var healthIconInputText:FlxUIInputText;
 	var vocalsInputText:FlxUIInputText;
@@ -771,6 +782,124 @@ class CharacterEditorState extends MusicBeatState
 				updateHealthBar();
 			}
 		}
+	}
+
+	function addNoteLoopsUI()
+	{
+		var tab_group = new FlxUI(null, UI_characterbox);
+		tab_group.name = "NoteLoops";
+		var y = 8;
+
+		var title = new FlxText(10, y, 340, "Hold Animation Settings", 11);
+		title.color = FlxColor.YELLOW;
+		tab_group.add(title); y += 18;
+
+		tab_group.add(new FlxText(10, y, 0, 'Animation:', 9)); y += 14;
+		noteLoopsAnimDropDown = new FlxUIDropDownMenu(10, y,
+			FlxUIDropDownMenu.makeStrIdLabelArray([''], true),
+			function(index:String) {
+				var i = Std.parseInt(index);
+				if (character.animationsArray[i] == null) return;
+				_noteLoopsCurAnim = character.animationsArray[i];
+				_refreshNoteLoopsFields();
+			});
+		tab_group.add(noteLoopsAnimDropDown); y += 26;
+
+		tab_group.add(new FlxText(10, y, 0, 'Hold Type:', 9)); y += 14;
+		var holdTypes = ["normal", "static", "loop2frame"];
+		noteLoopsHoldTypeDropDown = new FlxUIDropDownMenu(10, y,
+			FlxUIDropDownMenu.makeStrIdLabelArray(holdTypes, true),
+			function(index:String) {
+				if (_noteLoopsCurAnim == null) return;
+				var t = holdTypes[Std.parseInt(index)];
+				_noteLoopsCurAnim.hold_type = t == "normal" ? null : t;
+				_updateNoteLoopsVisibility();
+			});
+		tab_group.add(noteLoopsHoldTypeDropDown); y += 26;
+
+		tab_group.add(new FlxText(10, y, 240, 'Static Frame (freeze on frame #):', 9)); y += 14;
+		noteLoopsStaticFrameStepper = new FlxUINumericStepper(10, y, 1, 0, 0, 9999, 0);
+		tab_group.add(noteLoopsStaticFrameStepper); y += 24;
+
+		tab_group.add(new FlxText(10,  y, 0, 'Loop Start:', 9));
+		tab_group.add(new FlxText(155, y, 0, 'Loop End:',   9)); y += 14;
+		noteLoopsLoopStartStepper = new FlxUINumericStepper(10,  y, 1, 0, 0, 9999, 0);
+		noteLoopsLoopEndStepper   = new FlxUINumericStepper(155, y, 1, 1, 0, 9999, 0);
+		tab_group.add(noteLoopsLoopStartStepper);
+		tab_group.add(noteLoopsLoopEndStepper); y += 24;
+
+		tab_group.add(new FlxText(10, y, 240, 'End Anim (on note release):', 9)); y += 14;
+		noteLoopsEndAnimInputText = new FlxUIInputText(10, y, 230, '', 8);
+		tab_group.add(noteLoopsEndAnimInputText); y += 22;
+
+		var applyBtn = new FlxButton(10, y, "Apply", function() {
+			if (_noteLoopsCurAnim == null) return;
+			_noteLoopsCurAnim.hold_static_frame = Std.int(noteLoopsStaticFrameStepper.value);
+			_noteLoopsCurAnim.hold_loop_start   = Std.int(noteLoopsLoopStartStepper.value);
+			_noteLoopsCurAnim.hold_loop_end     = Std.int(noteLoopsLoopEndStepper.value);
+			_noteLoopsCurAnim.hold_end_anim     = noteLoopsEndAnimInputText.text.length > 0
+				? noteLoopsEndAnimInputText.text : null;
+			FlxG.sound.play(Paths.sound('confirmMenu'));
+		});
+		applyBtn.color = FlxColor.GREEN;
+		applyBtn.label.color = FlxColor.WHITE;
+
+		noteLoopsPreviewBtn = new FlxButton(90, y, "Preview (3s)", function() {
+			if (_noteLoopsCurAnim == null) return;
+			if (!character.isAnimateAtlas && character.animation.curAnim != null)
+				character.animation.curAnim.paused = false;
+			character.playAnim(_noteLoopsCurAnim.anim, true);
+			character.holdTimer = 9999;
+			new FlxTimer().start(3.0, function(_) {
+				if (!character.isAnimateAtlas && character.animation.curAnim != null)
+					character.animation.curAnim.paused = false;
+				character.holdTimer = 0;
+				character.dance();
+			});
+		});
+		tab_group.add(applyBtn);
+		tab_group.add(noteLoopsPreviewBtn); y += 24;
+
+		var hint = new FlxText(10, y, 340,
+			"normal=default  static=freeze on frame N  loop2frame=loop between frames", 9);
+		hint.color = 0xFFAAAAAA;
+		tab_group.add(hint);
+
+		UI_characterbox.addGroup(tab_group);
+		_reloadNoteLoopsAnimDropDown();
+	}
+
+	function _reloadNoteLoopsAnimDropDown():Void
+	{
+		if (noteLoopsAnimDropDown == null || character == null) return;
+		var names = [for (a in character.animationsArray) a.anim];
+		if (names.length == 0) names = [''];
+		noteLoopsAnimDropDown.setData(FlxUIDropDownMenu.makeStrIdLabelArray(names, true));
+		if (character.animationsArray.length > 0) {
+			_noteLoopsCurAnim = character.animationsArray[0];
+			_refreshNoteLoopsFields();
+		}
+	}
+
+	function _refreshNoteLoopsFields()
+	{
+		if (_noteLoopsCurAnim == null) return;
+		var holdType = _noteLoopsCurAnim.hold_type ?? "normal";
+		noteLoopsHoldTypeDropDown.selectedLabel = holdType;
+		noteLoopsStaticFrameStepper.value = _noteLoopsCurAnim.hold_static_frame ?? 0;
+		noteLoopsLoopStartStepper.value   = _noteLoopsCurAnim.hold_loop_start ?? 0;
+		noteLoopsLoopEndStepper.value     = _noteLoopsCurAnim.hold_loop_end ?? 1;
+		noteLoopsEndAnimInputText.text    = _noteLoopsCurAnim.hold_end_anim ?? '';
+		_updateNoteLoopsVisibility();
+	}
+
+	function _updateNoteLoopsVisibility()
+	{
+		var ht = _noteLoopsCurAnim != null ? (_noteLoopsCurAnim.hold_type ?? "normal") : "normal";
+
+		noteLoopsStaticFrameStepper.visible = noteLoopsStaticFrameStepper.active = (ht == "static");
+		noteLoopsLoopStartStepper.visible   = noteLoopsLoopStartStepper.active   = (ht == "loop2frame");
+		noteLoopsLoopEndStepper.visible     = noteLoopsLoopEndStepper.active     = (ht == "loop2frame");
 	}
 
 	function reloadCharacterImage()
@@ -1124,7 +1253,8 @@ class CharacterEditorState extends MusicBeatState
 			text.y = 32 + (20 * daLoop);
 			text.fieldWidth = 400;
 			text.fieldHeight = 20;
-			text.text = anim.anim + ": " + anim.offsets;
+			var holdTag = (anim.hold_type != null && anim.hold_type != "normal") ? ' [${anim.hold_type}]' : '';
+			text.text = anim.anim + holdTag + ": " + anim.offsets;
 			text.setFormat(null, 16, FlxColor.WHITE, LEFT, OUTLINE_FAST, FlxColor.BLACK);
 			text.scrollFactor.set();
 			text.borderSize = 1;
@@ -1134,6 +1264,7 @@ class CharacterEditorState extends MusicBeatState
 		}
 		updateTextColors();
 		if(animationDropDown != null) reloadAnimationDropDown();
+		_reloadNoteLoopsAnimDropDown();
 	}
 
 	inline function updateTextColors()

@@ -4,21 +4,6 @@ import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.graphics.frames.FlxAtlasFrames;
 
-/**
- *   // Sparrow (PNG+XML)
- *   var frames = LocalAtlasTextures.getSparrow("images/notes/NOTE_assets");
- *
- *   // Adobe Animate атлас
- *   var sprite = LocalAtlasTextures.getAnimateSprite(x, y, "images/characters/dad");
- *
- *   // Something
- *   var frames = LocalAtlasTextures.getAuto("images/something");
- *
- *   // Groups
- *   LocalAtlasTextures.registerGroup("characters", "images/characters/dad");
- *   LocalAtlasTextures.unloadGroup("characters");
- */
-
 #if flxanimate
 import flxanimate.FlxAnimate;
 #end
@@ -51,7 +36,7 @@ class LocalAtlasTextures
 	static var _totalHits:Int    = 0;
 	static var _totalMisses:Int  = 0;
 
-	public static function init()
+	public static function init():Void
 	{
 		_defineGroup('notes', [
 			'images/notes/NOTE_assets',
@@ -69,15 +54,15 @@ class LocalAtlasTextures
 		], true);
 
 		#if debug
-		trace('[LocalAtlasTextures] Init');
+		trace('[LocalAtlasTextures] init');
 		#end
 	}
+
 
 	public static function getSparrow(path:String, ?group:String):FlxAtlasFrames
 	{
 		return _getFrames(path, SPARROW, group);
 	}
-
 
 	public static function getPacker(path:String, ?group:String):FlxAtlasFrames
 	{
@@ -95,8 +80,7 @@ class LocalAtlasTextures
 		return _getFrames(path, fmt, group);
 	}
 
-
-	public static function applyToSprite(sprite:FlxSprite, path:String, ?group:String)
+	public static function applyToSprite(sprite:FlxSprite, path:String, ?group:String):Void
 	{
 		var fmt = _detectFormat(path);
 		switch (fmt)
@@ -107,7 +91,7 @@ class LocalAtlasTextures
 				sprite.frames = getPacker(path, group);
 			case ANIMATE:
 				#if debug
-				trace('[LocalAtlasTextures] ⚠ $path — Adobe Animate atlas. use getAnimateSprite()');
+				trace('[LocalAtlasTextures] $path — Adobe Animate atlas. use getAnimateSprite()');
 				#end
 			default:
 				sprite.frames = getSparrow(path, group);
@@ -115,7 +99,6 @@ class LocalAtlasTextures
 	}
 
 	#if flxanimate
-
 	public static function getAnimateSprite(x:Float, y:Float, folderPath:String, ?group:String):FlxAnimate
 	{
 		var resolvedPath = _resolveAnimatePath(folderPath);
@@ -133,6 +116,7 @@ class LocalAtlasTextures
 		return sprite;
 	}
 	#else
+
 	public static function getAnimateSprite(x:Float, y:Float, folderPath:String, ?group:String):FlxSprite
 	{
 		return new FlxSprite(x, y);
@@ -157,16 +141,16 @@ class LocalAtlasTextures
 		if (_cache.exists(path)) _cache.get(path).group = groupName;
 	}
 
-	public static function preloadGroup(groupName:String)
+	public static function preloadGroup(groupName:String):Void
 	{
 		var paths = _groups.get(groupName);
-		if (paths == null) { #if debug trace('[LocalAtlasTextures] Group not found: $groupName'); #end return; }
+		if (paths == null) { #if debug trace('[LocalAtlasTextures] group not found: $groupName'); #end return; }
 
 		for (path in paths)
 			if (!_cache.exists(path))
 				getAuto(path, groupName);
 
-		#if debug trace('[LocalAtlasTextures] preloadGroup("$groupName") ready'); #end
+		#if debug trace('[LocalAtlasTextures] preloadGroup("$groupName") done'); #end
 	}
 
 	public static function unloadGroup(groupName:String):Void
@@ -236,11 +220,11 @@ class LocalAtlasTextures
 		var t = haxe.Timer.stamp();
 
 		var frames:FlxAtlasFrames = switch (fmt) {
-			case PACKER:  Paths.getPackerAtlas(path);
-			default:      Paths.getSparrowAtlas(path);
+			case PACKER: Paths.getPackerAtlas(path);
+			default: Paths.getSparrowAtlas(path);
 		}
 
-		if (frames == null) { #if debug trace('[LocalAtlasTextures] not found: $path'); #end return null; }
+		if (frames == null) { #if debug trace('[LocalAtlasTextures] Not found: $path'); #end return null; }
 
 		var sizeBytes = 0;
 		if (frames.parent != null && frames.parent.bitmap != null)
