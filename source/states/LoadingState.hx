@@ -1,318 +1,244 @@
 package states;
 
-import lime.app.Promise;
-import lime.app.Future;
-
 import flixel.FlxState;
-
+import backend.StageData;
+import backend.SpritePreloader;
+import backend.LocalAtlasTextures;
 import openfl.utils.Assets;
 import lime.utils.Assets as LimeAssets;
 import lime.utils.AssetLibrary;
 import lime.utils.AssetManifest;
-
-import backend.StageData;
-
 import haxe.io.Path;
+import lime.app.Promise;
+import lime.app.Future;
 
+//переделано с нуля нахуй пдорас н рабочий
 class LoadingState extends MusicBeatState
 {
-	inline static var MIN_TIME = 1.0;
+	static inline var MIN_TIME:Float = 0.5;
 
-	// Browsers will load create(), you can make your song load a custom directory there
-	// If you're compiling to desktop (or something that doesn't use NO_PRELOAD_ALL), search for getNextState instead
-	// I'd recommend doing it on both actually lol
-	
-	// TO DO: Make this easier
-	
 	var target:FlxState;
-	var stopMusic = false;
+	var stopMusic:Bool;
 	var directory:String;
-	var callbacks:MultiCallback;
-	var targetShit:Float = 0;
+
+	var _manifestReady:Bool = false;
+	var _audioReady:Bool    = false;
+	var _preloadDone:Bool   = false;
+	var _minTimeDone:Bool   = false;
+	var _switching:Bool     = false;
+
+	var _audioTotal:Int     = 0;
+	var _audioLoaded:Int    = 0;
+
+	var funkay:FlxSprite;
+	var loadBar:FlxSprite;
+	var _barTarget:Float = 0;
+
+	var _preloader:SpritePreloader;
+	var _preloadProgress:Float = 0;
 
 	function new(target:FlxState, stopMusic:Bool, directory:String)
 	{
 		super();
-		this.target = target;
+		this.target    = target;
 		this.stopMusic = stopMusic;
 		this.directory = directory;
 	}
 
-	var funkay:FlxSprite;
-	var loadBar:FlxSprite;
 	override function create()
 	{
-		var bg:FlxSprite = new FlxSprite(0, 0).makeGraphic(FlxG.width, FlxG.height, 0xffcaff4d);
+		var bg = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, 0xffcaff4d);
 		bg.antialiasing = ClientPrefs.data.antialiasing;
-		add(bg);
-		funkay = new FlxSprite(0, 0).loadGraphic(Paths.getPath('images/funkay.png', IMAGE));
+		//add(bg);
+
+		funkay = new FlxSprite().loadGraphic(Paths.getPath('images/funkay.png', IMAGE));
 		funkay.setGraphicSize(0, FlxG.height);
 		funkay.updateHitbox();
-		add(funkay);
 		funkay.antialiasing = ClientPrefs.data.antialiasing;
 		funkay.scrollFactor.set();
 		funkay.screenCenter();
+		//add(funkay);
 
 		loadBar = new FlxSprite(0, FlxG.height - 20).makeGraphic(FlxG.width, 10, 0xffff16d2);
 		loadBar.screenCenter(X);
-		add(loadBar);
-		
-		initSongsManifest().onComplete
-		(
-			function (lib)
-			{
-				callbacks = new MultiCallback(onLoad);
-				var introComplete = callbacks.add("introComplete");
-				if (PlayState.SONG != null) {
-					checkLoadSong(getSongPath());
-					if (PlayState.SONG.needsVoices)
-						checkLoadSong(getVocalPath());
-				}
-				if(directory != null && directory.length > 0 && directory != 'shared') {
-					checkLibrary('week_assets');
-				}
+		loadBar.scale.x = 0;
+		//add(loadBar);
 
-				var fadeTime = 0.5;
-				FlxG.camera.fade(FlxG.camera.bgColor, fadeTime, true);
-				new FlxTimer().start(fadeTime + MIN_TIME, function(_) introComplete());
-			}
-		);
+		new FlxTimer().start(MIN_TIME, function(_) {
+			_minTimeDone = true;
+			_tryFinish();
+		});
+
+		FlxG.camera.fade(FlxG.camera.bgColor, 0.5, true);
+
+		_startManifest();
+		_startSpritePreloader();
 	}
-	
-	function checkLoadSong(path:String)
+
+	function _startManifest():Void
 	{
-		if (!Assets.cache.hasSound(path))
-		{
-			var library = Assets.getLibrary("songs");
-			final symbolPath = path.split(":").pop();
-			// @:privateAccess
-			// library.types.set(symbolPath, SOUND);
-			// @:privateAccess
-			// library.pathGroups.set(symbolPath, [library.__cacheBreak(symbolPath)]);
-			var callback = callbacks.add("song:" + path);
-			Assets.loadSound(path).onComplete(function (_) { callback(); });
-		}
+		_initSongsManifest().onComplete(function(_) {
+			#if debug trace('[LoadingState] Manifest ready'); #end
+			_manifestReady = true;
+			_startAudio(); // аудио только после manifest
+		});
 	}
-	
-	function checkLibrary(library:String) {
-		trace(Assets.hasLibrary(library));
-		if (Assets.getLibrary(library) == null)
-		{
-			@:privateAccess
-			if (!LimeAssets.libraryPaths.exists(library))
-				throw new haxe.Exception("Missing library: " + library);
 
-			var callback = callbacks.add("library:" + library);
-			Assets.loadLibrary(library).onComplete(function (_) { callback(); });
+	function _startAudio():Void
+	{
+		if (PlayState.SONG == null) {
+			_audioReady = true;
+			_tryFinish();
+			return;
+		}
+
+		var song = PlayState.SONG;
+		var paths:Array<String> = [Paths.inst(song.song)];
+		if (song.needsVoices) paths.push(Paths.voices(song.song));
+
+		var toLoad = paths.filter(p -> p != null && !Assets.cache.hasSound(p));
+
+		if (toLoad.length == 0) {
+			#if debug trace('[LoadingState] Audio already cached'); #end
+			_audioReady = true;
+			_tryFinish();
+			return;
+		}
+
+		_audioTotal  = toLoad.length;
+		_audioLoaded = 0;
+
+		for (path in toLoad) {
+			#if debug trace('[LoadingState] Loading audio: $path'); #end
+			Assets.loadSound(path).onComplete(function(_) {
+				_audioLoaded++;
+				#if debug trace('[LoadingState] Audio done: $_audioLoaded/$_audioTotal'); #end
+				if (_audioLoaded >= _audioTotal) {
+					_audioReady = true;
+					_tryFinish();
+				}
+			}).onError(function(e) {
+				trace('[LoadingState] ⚠ Audio error: $e');
+				_audioLoaded++;
+				if (_audioLoaded >= _audioTotal) {
+					_audioReady = true;
+					_tryFinish();
+				}
+			});
 		}
 	}
-	
+
+	function _startSpritePreloader():Void
+	{
+		_preloader = new SpritePreloader();
+		_preloader.onProgress = function(p) { _preloadProgress = p; };
+		_preloader.onComplete = function() {
+			_preloadDone = true;
+			#if debug trace('[LoadingState] Preload done'); #end
+			_tryFinish();
+		};
+
+		if (PlayState.SONG != null)
+			_preloader.start(PlayState.SONG.song);
+		else
+			_preloader.startMenuPreload();
+	}
+
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);
-		funkay.setGraphicSize(Std.int(0.88 * FlxG.width + 0.9 * (funkay.width - 0.88 * FlxG.width)));
-		funkay.updateHitbox();
-		if(controls.ACCEPT)
-		{
-			funkay.setGraphicSize(Std.int(funkay.width + 60));
-			funkay.updateHitbox();
-		}
 
-		if(callbacks != null) {
-			targetShit = FlxMath.remapToRange(callbacks.numRemaining / callbacks.length, 1, 0, 0, 1);
-			loadBar.scale.x += 0.5 * (targetShit - loadBar.scale.x);
-		}
+		if (_preloader != null) _preloader.tick();
+
+		var audioP  = (_audioTotal > 0) ? (_audioLoaded / _audioTotal) : (_audioReady ? 1.0 : 0.0);
+		var texP    = _preloadProgress;
+		var manifestP = _manifestReady ? 1.0 : 0.0;
+		_barTarget  = (audioP + texP + manifestP) / 3.0;
+		loadBar.scale.x += 0.15 * (_barTarget - loadBar.scale.x);
+
+		_tryFinish();
 	}
-	
-	function onLoad()
+
+	function _tryFinish():Void
 	{
+		if (_switching) return;
+		if (!_audioReady || !_preloadDone || !_minTimeDone) return;
+
+		_switching = true;
+		loadBar.scale.x = 1;
+
+		#if debug trace('[LoadingState] ✓ All ready — switching!'); #end
+
 		if (stopMusic && FlxG.sound.music != null)
 			FlxG.sound.music.stop();
-		
+
 		MusicBeatState.switchState(target);
 	}
-	
-	static function getSongPath()
+
+	override function destroy()
 	{
-		return Paths.inst(PlayState.SONG.song);
+		super.destroy();
+		_preloader = null;
 	}
-	
-	static function getVocalPath()
-	{
-		return Paths.voices(PlayState.SONG.song);
-	}
-	
+
 	inline static public function loadAndSwitchState(target:FlxState, stopMusic = false)
 	{
 		MusicBeatState.switchState(getNextState(target, stopMusic));
 	}
-	
+
 	static function getNextState(target:FlxState, stopMusic = false):FlxState
 	{
-		var directory:String = 'shared';
-		var weekDir:String = StageData.forceNextDirectory;
+		var directory = 'shared';
+		var weekDir   = StageData.forceNextDirectory;
 		StageData.forceNextDirectory = null;
 
-		if(weekDir != null && weekDir.length > 0 && weekDir != '') directory = weekDir;
+		if (weekDir != null && weekDir.length > 0 && weekDir != '')
+			directory = weekDir;
 
 		Paths.setCurrentLevel(directory);
-		trace('Setting asset folder to ' + directory);
+		#if debug trace('[LoadingState] asset folder: $directory'); #end
 
-		#if NO_PRELOAD_ALL
-		var loaded:Bool = false;
-		if (PlayState.SONG != null) {
-			loaded = isSoundLoaded(getSongPath()) && (!PlayState.SONG.needsVoices || isSoundLoaded(getVocalPath())) && isLibraryLoaded('week_assets');
-		}
-		
-		if (!loaded)
-			return new LoadingState(target, stopMusic, directory);
-		#end
-		if (stopMusic && FlxG.sound.music != null)
-			FlxG.sound.music.stop();
-		
-		return target;
+		return new LoadingState(target, stopMusic, directory);
 	}
-	
-	#if NO_PRELOAD_ALL
-	static function isSoundLoaded(path:String):Bool
-	{
-		trace(path);
-		return Assets.cache.hasSound(path);
-	}
-	
-	static function isLibraryLoaded(library:String):Bool
-	{
-		return Assets.getLibrary(library) != null;
-	}
-	#end
-	
-	override function destroy()
-	{
-		super.destroy();
-		
-		callbacks = null;
-	}
-	
-	static function initSongsManifest()
+
+	static function _initSongsManifest():Future<AssetLibrary>
 	{
 		var id = "songs";
-		var promise = new Promise<AssetLibrary>();
+		var existing = LimeAssets.getLibrary(id);
+		if (existing != null) return Future.withValue(existing);
 
-		var library = LimeAssets.getLibrary(id);
-
-		if (library != null)
-		{
-			return Future.withValue(library);
-		}
-
-		var path = id;
-		var rootPath = null;
+		var promise  = new Promise<AssetLibrary>();
+		var path     = id;
+		var rootPath:String = null;
 
 		@:privateAccess
 		var libraryPaths = LimeAssets.libraryPaths;
-		if (libraryPaths.exists(id))
-		{
-			path = libraryPaths[id];
+
+		if (libraryPaths.exists(id)) {
+			path     = libraryPaths[id];
 			rootPath = Path.directory(path);
-		}
-		else
-		{
-			if (StringTools.endsWith(path, ".bundle"))
-			{
+		} else {
+			if (StringTools.endsWith(path, ".bundle")) {
 				rootPath = path;
-				path += "/library.json";
-			}
-			else
-			{
+				path    += "/library.json";
+			} else {
 				rootPath = Path.directory(path);
 			}
 			@:privateAccess
 			path = LimeAssets.__cacheBreak(path);
 		}
 
-		AssetManifest.loadFromFile(path, rootPath).onComplete(function(manifest)
-		{
-			if (manifest == null)
-			{
-				promise.error("Cannot parse asset manifest for library \"" + id + "\"");
-				return;
-			}
-
-			var library = AssetLibrary.fromManifest(manifest);
-
-			if (library == null)
-			{
-				promise.error("Cannot open library \"" + id + "\"");
-			}
-			else
-			{
-				@:privateAccess
-				LimeAssets.libraries.set(id, library);
-				library.onChange.add(LimeAssets.onChange.dispatch);
-				promise.completeWith(Future.withValue(library));
-			}
-		}).onError(function(_)
-		{
-			promise.error("There is no asset library with an ID of \"" + id + "\"");
+		AssetManifest.loadFromFile(path, rootPath).onComplete(function(manifest) {
+			if (manifest == null) { promise.error("Cannot parse manifest: $id"); return; }
+			var lib = AssetLibrary.fromManifest(manifest);
+			if (lib == null) { promise.error("Cannot open library: $id"); return; }
+			@:privateAccess LimeAssets.libraries.set(id, lib);
+			lib.onChange.add(LimeAssets.onChange.dispatch);
+			promise.completeWith(Future.withValue(lib));
+		}).onError(function(e) {
+			promise.error('No library: $id ($e)');
 		});
 
 		return promise.future;
 	}
-}
-
-class MultiCallback
-{
-	public var callback:Void->Void;
-	public var logId:String = null;
-	public var length(default, null) = 0;
-	public var numRemaining(default, null) = 0;
-	
-	var unfired = new Map<String, Void->Void>();
-	var fired = new Array<String>();
-	
-	public function new (callback:Void->Void, logId:String = null)
-	{
-		this.callback = callback;
-		this.logId = logId;
-	}
-	
-	public function add(id = "untitled")
-	{
-		id = '$length:$id';
-		length++;
-		numRemaining++;
-		var func:Void->Void = null;
-		func = function ()
-		{
-			if (unfired.exists(id))
-			{
-				unfired.remove(id);
-				fired.push(id);
-				numRemaining--;
-				
-				if (logId != null)
-					log('fired $id, $numRemaining remaining');
-				
-				if (numRemaining == 0)
-				{
-					if (logId != null)
-						log('all callbacks fired');
-					callback();
-				}
-			}
-			else
-				log('already fired $id');
-		}
-		unfired[id] = func;
-		return func;
-	}
-	
-	inline function log(msg):Void
-	{
-		if (logId != null)
-			trace('$logId: $msg');
-	}
-	
-	public function getFired() return fired.copy();
-	public function getUnfired() return [for (id in unfired.keys()) id];
 }

@@ -1,174 +1,204 @@
 package backend;
 
-import flixel.FlxG;
 import openfl.utils.Assets;
 
-/**
- *   var preloader = new SpritePreloader();
- *   preloader.onProgress = (p) -> loadBar.scale.x = p;
- *   preloader.onComplete = () -> switchState(target);
- *   preloader.start(songName, difficulty);
- */
+typedef PreloadTask = { path:String, type:TaskType }
+enum TaskType { IMAGE; SPARROW; PACKER; }
+
 class SpritePreloader
 {
-	public var onProgress:Float -> Void = null;
-
-	public var onComplete:Void -> Void = null;
+	public var onProgress:Float->Void = null;
+	public var onComplete:Void->Void  = null;
 
 	var _queue:Array<PreloadTask> = [];
-	var _total:Int    = 0;
-	var _done:Int     = 0;
+	var _done:Int    = 0;
+	var _total:Int   = 0;
 	var _started:Bool = false;
+	var _finished:Bool = false;
 
 	public function new() {}
 
-	public function start(songName:String, ?difficulty:String = 'Normal'):Void
+	public function start(songName:String):Void
 	{
 		if (_started) return;
 		_started = true;
 
-		_queueGameplayUI();
-		_queueNotes();
-		_queueSong(songName);
+		_scanNotes();
+		_scanGameplayUI();
+
+		if (PlayState.SONG != null)
+		{
+			var song = PlayState.SONG;
+			#if debug trace('[SpritePreloader] Song: p1=${song.player1} p2=${song.player2} gf=${song.gfVersion} stage=${song.stage}'); #end
+
+			if (song.player1 != null)   _scanCharacter(song.player1);
+			if (song.player2 != null)   _scanCharacter(song.player2);
+			if (song.gfVersion != null) _scanCharacter(song.gfVersion);
+			if (song.stage != null)     _scanStage(song.stage);
+		}
 
 		_total = _queue.length;
+		#if debug trace('[SpritePreloader] Total: $_total tasks queued'); for (t in _queue) trace('  - ${t.path} (${t.type})'); #end
 
-		#if debug
-		trace('[SpritePreloader] Total: $_total for "$songName"');
-		#end
-
-		_processNext();
+		if (_total == 0) _finish();
 	}
 
 	public function startMenuPreload():Void
 	{
 		if (_started) return;
 		_started = true;
-
-		_queueImage('shared/images/menuBG');
-		_queueImage('shared/images/menuDesat');
-		_queueAtlas('shared/images/FNF_main_menu_assets');
-
+		_enqueueAuto('menuBG');
+		_enqueueAuto('menuDesat');
+		_enqueueAuto('FNF_main_menu_assets');
 		_total = _queue.length;
-		_processNext();
+		if (_total == 0) _finish();
 	}
 
-	function _queueGameplayUI():Void
+	public function tick():Void
 	{
-		for (r in ['sick', 'good', 'bad', 'shit'])
-			_queueImage('shared/images/ui/$r');
-
-		for (i in 0...10)
-			_queueImage('shared/images/ui/num$i');
-
-		_queueImage('shared/images/healthBar');
-		_queueAtlas('shared/images/ui/iconGrid');
-	}
-
-	function _queueNotes():Void
-	{
-		_queueAtlas('shared/images/notes/NOTE_assets');
-		_queueAtlas('shared/images/notes/noteSplashes');
-		_queueAtlas('shared/images/notes/NOTE_hold_assets');
-	}
-
-	function _queueSong(songName:String):Void
-	{
-		if (PlayState.SONG == null) return;
-
-		var song = PlayState.SONG;
-		if (song.player1 != null) _queueCharacter(song.player1);
-		if (song.player2 != null) _queueCharacter(song.player2);
-		if (song.gfVersion != null) _queueCharacter(song.gfVersion);
-
-		if (song.stage != null) _queueStage(song.stage);
-	}
-
-	function _queueCharacter(charName:String):Void
-	{
-		_queueAtlas('shared/images/characters/$charName/$charName');
-		_queueImage('shared/images/icons/icon-$charName');
-	}
-
-	function _queueStage(stageName:String):Void
-	{
-		var stagePath = Paths.getPath('data/stages/$stageName.json', TEXT);
-		if (Assets.exists(stagePath))
-		{
-			try {
-				var data = haxe.Json.parse(Assets.getText(stagePath));
-				if (data != null && data.objects != null)
-				{
-					for (obj in (data.objects : Array<Dynamic>))
-					{
-						if (obj.image != null)
-							_queueImage('shared/images/' + obj.image);
-					}
-				}
-			} catch(e:Dynamic) {}
-		}
-	}
-
-	function _queueImage(path:String):Void
-	{
-		_queue.push({ type: IMAGE, path: path });
-	}
-
-	function _queueAtlas(path:String):Void
-	{
-		_queue.push({ type: ATLAS, path: path });
-	}
-
-	function _processNext():Void
-	{
-		if (_queue.length == 0)
-		{
-			_finish();
-			return;
-		}
-
+		if (_finished || !_started || _queue.length == 0) return;
 		var task = _queue.shift();
-		_executeTask(task);
+		_execute(task);
+		_done++;
+		if (onProgress != null && _total > 0) onProgress(_done / _total);
+		if (_queue.length == 0) _finish();
 	}
 
-	function _executeTask(task:PreloadTask):Void
+	function _scanNotes():Void
+	{
+		for (key in ['NOTE_assets', 'noteSplashes', 'NOTE_hold_assets'])
+			_enqueueAuto(key);
+	}
+
+	function _scanGameplayUI():Void
+	{
+		for (r in ['sick', 'good', 'bad', 'shit']) _enqueueAuto(r);
+		for (i in 0...10) _enqueueAuto('num$i');
+		_enqueueAuto('healthBar');
+		_enqueueAuto('iconGrid');
+	}
+
+	function _scanCharacter(charName:String):Void
 	{
 		try {
-			switch (task.type)
-			{
-				case IMAGE:
-					var imgPath = Paths.getPath('${task.path}.png', IMAGE);
-					if (Assets.exists(imgPath))
-						Paths.image(task.path);
-
-				case ATLAS:
-					var xmlPath = Paths.getPath('${task.path}.xml', TEXT);
-					var txtPath = Paths.getPath('${task.path}.txt', TEXT);
-					if (Assets.exists(xmlPath))
-						LocalAtlasTextures.getSparrow(task.path, 'preload');
-					else if (Assets.exists(txtPath))
-						LocalAtlasTextures.getPacker(task.path, 'preload');
-					else
-						Paths.image(task.path);
+			var charPath:String = null;
+			#if (MODS_ALLOWED && sys)
+			var modPath = Paths.modFolders('characters/$charName.json');
+			if (sys.FileSystem.exists(modPath)) charPath = modPath;
+			#end
+			if (charPath == null) {
+				var sp = Paths.getSharedPath('characters/$charName.json');
+				if (Assets.exists(sp)) charPath = sp;
 			}
-		} catch(e:Dynamic) {
-			#if debug trace('[SpritePreloader] err: ${task.path} — $e'); #end
+			if (charPath == null) {
+				#if debug trace('[SpritePreloader] Character not found: $charName'); #end
+				return;
+			}
+
+			var txt:String;
+			#if sys
+			txt = sys.io.File.getContent(charPath);
+			#else
+			txt = Assets.getText(charPath);
+			#end
+
+			var data:Dynamic = haxe.Json.parse(txt);
+			if (data == null || data.image == null) return;
+
+			var imgPath:String = data.image;
+			#if debug trace('[SpritePreloader] Scanning character: $charName → $imgPath'); #end
+
+			_enqueueAuto(imgPath);
+
+			var iconName:String = data.healthicon != null ? data.healthicon : charName;
+			_enqueueAuto('icons/icon-$iconName');
 		}
+		catch (e:Dynamic) {
+			#if debug trace('[SpritePreloader] ⚠ Character "$charName": $e'); #end
+		}
+	}
 
-		_done++;
-		var progress = _total > 0 ? _done / _total : 1.0;
-		if (onProgress != null) onProgress(progress);
+	function _scanStage(stageName:String):Void
+	{
+		try {
+			var stagePath:String = null;
+			#if (MODS_ALLOWED && sys)
+			var modPath = Paths.modFolders('stages/$stageName.json');
+			if (sys.FileSystem.exists(modPath)) stagePath = modPath;
+			#end
+			if (stagePath == null) {
+				var sp = Paths.getSharedPath('stages/$stageName.json');
+				if (Assets.exists(sp)) stagePath = sp;
+			}
+			if (stagePath == null) return;
 
-		haxe.Timer.delay(_processNext, 1);
+			var txt:String;
+			#if sys
+			txt = sys.io.File.getContent(stagePath);
+			#else
+			txt = Assets.getText(stagePath);
+			#end
+
+			var data:Dynamic = haxe.Json.parse(txt);
+			if (data == null || data.objects == null) return;
+
+			for (obj in (data.objects : Array<Dynamic>))
+				if (obj.image != null) _enqueueAuto(obj.image);
+		}
+		catch (e:Dynamic) {
+			#if debug trace('[SpritePreloader] ⚠ Stage "$stageName": $e'); #end
+		}
+	}
+
+	function _enqueueAuto(key:String):Void
+	{
+		var xmlShared = Paths.getSharedPath('images/$key.xml');
+		#if (MODS_ALLOWED && sys)
+		var xmlMod = Paths.modFolders('images/$key.xml');
+		if (sys.FileSystem.exists(xmlMod)) { _queue.push({path:key, type:SPARROW}); return; }
+		#end
+		if (Assets.exists(xmlShared)) { _queue.push({path:key, type:SPARROW}); return; }
+
+		// TXT (Packer)
+		var txtShared = Paths.getSharedPath('images/$key.txt');
+		#if (MODS_ALLOWED && sys)
+		var txtMod = Paths.modFolders('images/$key.txt');
+		if (sys.FileSystem.exists(txtMod)) { _queue.push({path:key, type:PACKER}); return; }
+		#end
+		if (Assets.exists(txtShared)) { _queue.push({path:key, type:PACKER}); return; }
+
+		// PNG
+		var pngShared = Paths.getSharedPath('images/$key.png');
+		#if (MODS_ALLOWED && sys)
+		var pngMod = Paths.modFolders('images/$key.png');
+		if (sys.FileSystem.exists(pngMod)) { _queue.push({path:key, type:IMAGE}); return; }
+		#end
+		if (Assets.exists(pngShared)) { _queue.push({path:key, type:IMAGE}); return; }
+
+		#if debug trace('[SpritePreloader] skiped (not found): $key'); #end
+	}
+
+	function _execute(task:PreloadTask):Void
+	{
+		try {
+			switch (task.type) {
+				case IMAGE:   Paths.image(task.path);
+				case SPARROW: Paths.getSparrowAtlas(task.path);
+				case PACKER:  Paths.getPackerAtlas(task.path);
+			}
+			#if debug trace('[SpritePreloader] loaded: ${task.path}'); #end
+		}
+		catch (e:Dynamic) {
+			#if debug trace('[SpritePreloader] ⚠ Error (${task.path}): $e'); #end
+		}
 	}
 
 	function _finish():Void
 	{
+		if (_finished) return;
+		_finished = true;
 		openfl.system.System.gc();
-		#if debug trace('[SpritePreloader] done $_done '); #end
+		#if debug trace('[SpritePreloader] done $_done'); #end
 		if (onComplete != null) onComplete();
 	}
 }
-
-enum PreloadTaskType { IMAGE; ATLAS; }
-typedef PreloadTask = { type:PreloadTaskType, path:String }

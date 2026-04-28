@@ -31,11 +31,6 @@ typedef NoteSplashData = {
 	a:Float
 }
 
-/**
- * The note object used as a data structure to spawn and manage notes during gameplay.
- * 
- * If you want to make a custom note type, you should search for: "function set_noteType"
-**/
 class Note extends FlxSprite
 {
 	public var extraData:Map<String, Dynamic> = new Map<String, Dynamic>();
@@ -58,9 +53,9 @@ class Note extends FlxSprite
 
 	public var spawned:Bool = false;
 
-	public var tail:Array<Note> = []; // for sustains
+	public var tail:Array<Note> = [];
 	public var parent:Note;
-	public var blockHit:Bool = false; // only works for player
+	public var blockHit:Bool = false;
 
 	public var sustainLength:Float = 0;
 	public var isSustainNote:Bool = false;
@@ -126,9 +121,7 @@ class Note extends FlxSprite
 	public var hitsoundChartEditor:Bool = true;
 	public var hitsound:String = 'hitsound';
 
-	// ─── LOCAL ENGINE: NotePool support ──────────────────────────────────────────
-	private var _poolOwned:Bool = false; // true = нота из пула, false = создана напрямую
-	// ─────────────────────────────────────────────────────────────────────────────
+	private var _poolOwned:Bool = false;
 
 	private function set_multSpeed(value:Float):Float {
 		resizeByRatio(value / multSpeed);
@@ -155,7 +148,7 @@ class Note extends FlxSprite
 
 	public function defaultRGB()
 	{
-		if (rgbShader == null) return; // LOCAL ENGINE: guard
+		if (rgbShader == null) return;
 		var arr:Array<FlxColor> = ClientPrefs.data.arrowRGB[noteData];
 		if(PlayState.isPixelStage) arr = ClientPrefs.data.arrowRGBPixel[noteData];
 
@@ -334,10 +327,13 @@ class Note extends FlxSprite
 		this.noteData = noteData;
 
 		if(noteData > -1) {
+			texture = '__force_reload__';
 			texture = '';
-			// вместо проверки и смены парент просто создаем новый шейдер, привязаный который к текущему спрайту (вызываем принудительно)
-			rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
-			if (PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
+			if (rgbShader == null)
+				rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
+			else
+				rgbShader.parent = initializeGlobalRGBShader(noteData);
+			if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
 
 			x += swagWidth * (noteData);
 			if(!isSustainNote && noteData < colArray.length) {
@@ -458,8 +454,6 @@ class Note extends FlxSprite
 		velocity.set(0, 0);
 		acceleration.set(0, 0);
 		clipRect         = null;
-		texture		= null;
-		rgbShader	= null;
 
 		noteSplashData.disabled       = false;
 		noteSplashData.texture        = null;

@@ -11,6 +11,7 @@ import haxe.Json;
 
 import backend.Song;
 import backend.Section;
+import backend.LocalAtlasTextures;
 import states.stages.objects.TankmenBG;
 
 typedef CharacterFile = {
@@ -37,6 +38,12 @@ typedef AnimArray = {
 	var loop:Bool;
 	var indices:Array<Int>;
 	var offsets:Array<Int>;
+
+	@:optional var hold_type:Null<String>;
+	@:optional var hold_static_frame:Null<Int>;
+	@:optional var hold_loop_start:Null<Int>;
+	@:optional var hold_loop_end:Null<Int>;
+	@:optional var hold_end_anim:Null<String>;
 }
 
 class Character extends FlxSprite
@@ -56,6 +63,10 @@ class Character extends FlxSprite
 	public var holdTimer:Float = 0;
 	public var heyTimer:Float = 0;
 	public var specialAnim:Bool = false;
+
+	var _holdLoopTimer:Float = 0;
+	var _holdActive:Bool = false;
+	var _holdAnimName:String = '';
 	public var animationNotes:Array<Dynamic> = [];
 	public var stunned:Bool = false;
 	public var singDuration:Float = 4; //Multiplier of how long a character holds the sing pose
@@ -149,7 +160,13 @@ class Character extends FlxSprite
 		updateHitbox();
 
 		if(!isAnimateAtlas)
-			frames = Paths.getAtlas(json.image);
+		{
+			var atlasFrames = LocalAtlasTextures.getAuto(json.image, 'characters');
+			if (atlasFrames != null)
+				frames = atlasFrames;
+			else
+				frames = Paths.getAtlas(json.image);
+		}
 		#if flxanimate
 		else
 		{
@@ -278,7 +295,9 @@ class Character extends FlxSprite
 				if(isAnimationFinished()) playAnim(getAnimationName(), false, false, animation.curAnim.frames.length - 3);
 		}
 
-		if (getAnimationName().startsWith('sing')) holdTimer += elapsed;
+		var curAnimName:String = getAnimationName();
+
+		if (curAnimName.startsWith('sing')) holdTimer += elapsed;
 		else if(isPlayer) holdTimer = 0;
 
 		if (!isPlayer && holdTimer >= Conductor.stepCrochet * (0.0011 #if FLX_PITCH / (FlxG.sound.music != null ? FlxG.sound.music.pitch : 1) #end) * singDuration)
@@ -287,11 +306,64 @@ class Character extends FlxSprite
 			holdTimer = 0;
 		}
 
-		var name:String = getAnimationName();
-		if(isAnimationFinished() && animOffsets.exists('$name-loop'))
-			playAnim('$name-loop');
+		if (curAnimName.startsWith('sing') && !curAnimName.endsWith('miss'))
+		{
+			var animData = getAnimData(curAnimName);
+			if (animData != null)
+			{
+				var ht = animData.hold_type;
+				if (ht == 'static')
+				{
+					if (!isAnimateAtlas && animation.curAnim != null)
+					{
+						var targetFrame:Int = animData.hold_static_frame ?? (animation.curAnim.frames.length - 1);
+						if (animation.curAnim.curFrame >= targetFrame || animation.curAnim.finished)
+						{
+							animation.curAnim.curFrame = targetFrame;
+						}
+					}
+				}
+				else if (ht == 'loop2frame')
+				{
+					if (!isAnimateAtlas && animation.curAnim != null)
+					{
+						var loopStart:Int = animData.hold_loop_start ?? 0;
+						var loopEnd:Int   = animData.hold_loop_end   ?? 1;
+						if (loopEnd >= animation.curAnim.frames.length)
+							loopEnd = animation.curAnim.frames.length - 1;
+						if (animation.curAnim.curFrame >= loopEnd || animation.curAnim.finished)
+						{
+							animation.curAnim.curFrame = loopStart;
+						}
+					}
+				}
+			}
+		}
+		var wasHolding = _holdActive;
+		_holdActive = curAnimName.startsWith('sing') && !curAnimName.endsWith('miss');
+		if (wasHolding && !_holdActive && _holdAnimName.length > 0)
+		{
+			var prevData = getAnimData(_holdAnimName);
+			if (prevData != null && prevData.hold_end_anim != null && animOffsets.exists(prevData.hold_end_anim))
+			{
+				playAnim(prevData.hold_end_anim, true);
+				specialAnim = true;
+			}
+		}
+		_holdAnimName = _holdActive ? curAnimName : '';
+
+		if(isAnimationFinished() && animOffsets.exists('$curAnimName-loop'))
+			playAnim('$curAnimName-loop');
 
 		super.update(elapsed);
+	}
+
+	public function getAnimData(?animName:String):Null<AnimArray>
+	{
+		var name = animName != null ? animName : getAnimationName();
+		for (a in animationsArray)
+			if (a.anim == name) return a;
+		return null;
 	}
 
 	inline public function isAnimationNull():Bool
