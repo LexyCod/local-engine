@@ -31,6 +31,11 @@ typedef NoteSplashData = {
 	a:Float
 }
 
+/**
+ * The note object used as a data structure to spawn and manage notes during gameplay.
+ * 
+ * If you want to make a custom note type, you should search for: "function set_noteType"
+**/
 class Note extends FlxSprite
 {
 	public var extraData:Map<String, Dynamic> = new Map<String, Dynamic>();
@@ -53,9 +58,9 @@ class Note extends FlxSprite
 
 	public var spawned:Bool = false;
 
-	public var tail:Array<Note> = [];
+	public var tail:Array<Note> = []; // for sustains
 	public var parent:Note;
-	public var blockHit:Bool = false;
+	public var blockHit:Bool = false; // only works for player
 
 	public var sustainLength:Float = 0;
 	public var isSustainNote:Bool = false;
@@ -297,16 +302,10 @@ class Note extends FlxSprite
 		x += offsetX;
 	}
 
-	/**
-	 * LOCAL ENGINE: reinit() — переиспользование ноты из пула.
-	 * Полностью повторяет логику конструктора без super()/new Animation.
-	 * PlayState вызывает это вместо new Note() когда берёт ноту из пула.
-	 */
 	public function reinit(strumTime:Float, noteData:Int, ?prevNote:Note, ?sustainNote:Bool = false, ?inEditor:Bool = false, ?createdFrom:Dynamic = null):Void
 	{
 		if(createdFrom == null) createdFrom = PlayState.instance;
 
-		// Сброс всех полей
 		_resetGameplayFields();
 
 		if (prevNote == null) prevNote = this;
@@ -314,9 +313,7 @@ class Note extends FlxSprite
 		this.prevNote = prevNote;
 		isSustainNote = sustainNote;
 		this.inEditor = inEditor;
-		// moves уже false
 
-		// Позиционирование — точно как в конструкторе
 		x = 0;
 		x += (ClientPrefs.data.middleScroll ? PlayState.STRUM_X_MIDDLESCROLL : PlayState.STRUM_X) + 50;
 		y = 0;
@@ -327,8 +324,8 @@ class Note extends FlxSprite
 		this.noteData = noteData;
 
 		if(noteData > -1) {
-			texture = '__force_reload__';
-			texture = '';
+			reloadNote(texture);
+			if (frames == null) reloadNote('');
 			if (rgbShader == null)
 				rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
 			else
@@ -391,7 +388,6 @@ class Note extends FlxSprite
 
 	private function _resetGameplayFields():Void
 	{
-		// Разрываем старые связи
 		if (this.prevNote != null && this.prevNote != this) this.prevNote.nextNote = null;
 		if (this.nextNote != null) this.nextNote.prevNote = null;
 
@@ -409,7 +405,7 @@ class Note extends FlxSprite
 		blockHit         = false;
 		sustainLength    = 0;
 		isSustainNote    = false;
-		@:bypassAccessor noteType = null; // bypass set_noteType — rgbShader может быть null
+		@:bypassAccessor noteType = null;
 		prevNote         = null;
 		nextNote         = null;
 		parent           = null;
@@ -426,7 +422,7 @@ class Note extends FlxSprite
 		hitsound         = 'hitsound';
 		hitsoundChartEditor = true;
 		multAlpha        = 1;
-		@:bypassAccessor multSpeed = 1; // bypass set_multSpeed — animation может быть null
+		@:bypassAccessor multSpeed = 1;
 		copyX            = true;
 		copyY            = true;
 		copyAngle        = true;
@@ -537,12 +533,20 @@ class Note extends FlxSprite
 				offsetX -= _lastNoteOffX;
 			}
 		} else {
-			frames = Paths.getSparrowAtlas(skin);
-			loadNoteAnims();
-			if(!isSustainNote)
+			var atlas = Paths.getSparrowAtlas(skin);
+			if (atlas == null)
 			{
-				centerOffsets();
-				centerOrigin();
+				atlas = Paths.getSparrowAtlas(defaultNoteSkin);
+			}
+			frames = atlas;
+			if (frames != null)
+			{
+				loadNoteAnims();
+				if(!isSustainNote)
+				{
+					centerOffsets();
+					centerOrigin();
+				}
 			}
 		}
 
