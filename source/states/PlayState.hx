@@ -285,7 +285,7 @@ class PlayState extends MusicBeatState
 	override public function create()
 	{
 		//trace('Playback Rate: ' + playbackRate);
-		Paths.clearStoredMemory();
+		if (!isStoryMode) Paths.clearStoredMemory();
 
 		startCallback = startCountdown;
 		endCallback = endSong;
@@ -1747,7 +1747,7 @@ class PlayState extends MusicBeatState
 				var nextSong:String = storyPlaylist[1];
 				var diff:String = Difficulty.getFilePath();
 				AsyncSongLoader.preload(nextSong, diff);
-				#if (debug || dev) trace('[PlayState] Запущена предзагрузка: $nextSong'); #end
+				#if (debug || dev) trace('[PlayState] preload: $nextSong'); #end
 			}
 
 			var songCalc:Float = (songLength - curTime);

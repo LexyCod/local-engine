@@ -39,7 +39,8 @@ typedef AnimArray = {
 	var indices:Array<Int>;
 	var offsets:Array<Int>;
 
-	@:optional var hold_type:Null<String>;
+	@:optional var hold_type:Null<String>;   // null/"normal" | "static" | "loop2frame"
+
 	@:optional var hold_static_frame:Null<Int>;
 	@:optional var hold_loop_start:Null<Int>;
 	@:optional var hold_loop_end:Null<Int>;
@@ -161,11 +162,7 @@ class Character extends FlxSprite
 
 		if(!isAnimateAtlas)
 		{
-			var atlasFrames = LocalAtlasTextures.getAuto(json.image, 'characters');
-			if (atlasFrames != null)
-				frames = atlasFrames;
-			else
-				frames = Paths.getAtlas(json.image);
+			frames = Paths.getAtlas(json.image);
 		}
 		#if flxanimate
 		else

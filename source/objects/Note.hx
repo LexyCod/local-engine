@@ -325,12 +325,17 @@ class Note extends FlxSprite
 
 		if(noteData > -1) {
 			reloadNote(texture);
-			if (frames == null) reloadNote('');
+			texture = '';
+
+			rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
+			if (PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
+
 			if (rgbShader == null)
 				rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
 			else
 				rgbShader.parent = initializeGlobalRGBShader(noteData);
 			if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
+			defaultRGB();
 
 			x += swagWidth * (noteData);
 			if(!isSustainNote && noteData < colArray.length) {
@@ -388,6 +393,7 @@ class Note extends FlxSprite
 
 	private function _resetGameplayFields():Void
 	{
+		// Разрываем старые связи
 		if (this.prevNote != null && this.prevNote != this) this.prevNote.nextNote = null;
 		if (this.nextNote != null) this.nextNote.prevNote = null;
 
