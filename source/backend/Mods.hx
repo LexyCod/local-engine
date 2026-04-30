@@ -57,9 +57,24 @@ class Mods
 				if (FileSystem.isDirectory(path) && !ignoreModFolders.contains(folder.toLowerCase()) && !list.contains(folder))
 					list.push(folder);
 			}
+
+			for (folder in ZipModManager.getModNames())
+				if (!ignoreModFolders.contains(folder.toLowerCase()) && !list.contains(folder))
+					list.push(folder);
 		}
 		#end
 		return list;
+	}
+
+	public static function modExists(folder:String):Bool
+	{
+		#if MODS_ALLOWED
+		if (folder == null || folder.trim().length < 1) return false;
+		var path = Paths.mods(folder);
+		return (FileSystem.exists(path) && FileSystem.isDirectory(path)) || ZipModManager.hasZip(folder);
+		#else
+		return false;
+		#end
 	}
 	
 	inline public static function mergeAllTextsNamed(path:String, defaultDirectory:String = null, allowDuplicates:Bool = false)
@@ -127,15 +142,10 @@ class Mods
 		#if MODS_ALLOWED
 		if(folder == null) folder = Mods.currentModDirectory;
 
-		var path = Paths.mods(folder + '/pack.json');
-		if(FileSystem.exists(path)) {
+		var rawJson:String = Paths.getModFileText('pack.json', folder);
+		if(rawJson != null && rawJson.length > 0) {
 			try {
-				#if sys
-				var rawJson:String = File.getContent(path);
-				#else
-				var rawJson:String = Assets.getText(path);
-				#end
-				if(rawJson != null && rawJson.length > 0) return tjson.TJSON.parse(rawJson);
+				return tjson.TJSON.parse(rawJson);
 			} catch(e:Dynamic) {
 				trace(e);
 			}
@@ -181,7 +191,7 @@ class Mods
 			{
 				var dat:Array<String> = mod.split("|");
 				var folder:String = dat[0];
-				if(folder.trim().length > 0 && FileSystem.exists(Paths.mods(folder)) && FileSystem.isDirectory(Paths.mods(folder)) && !added.contains(folder))
+				if(folder.trim().length > 0 && modExists(folder) && !added.contains(folder))
 				{
 					added.push(folder);
 					list.push([folder, (dat[1] == "1")]);
@@ -194,7 +204,7 @@ class Mods
 		// Scan for folders that aren't on modsList.txt yet
 		for (folder in getModDirectories())
 		{
-			if(folder.trim().length > 0 && FileSystem.exists(Paths.mods(folder)) && FileSystem.isDirectory(Paths.mods(folder)) &&
+			if(folder.trim().length > 0 && modExists(folder) &&
 			!ignoreModFolders.contains(folder.toLowerCase()) && !added.contains(folder))
 			{
 				added.push(folder);

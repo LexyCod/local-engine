@@ -93,6 +93,30 @@ class LoadingState extends MusicBeatState
 		}
 
 		var song = PlayState.SONG;
+		_audioTotal = song.needsVoices ? 2 : 1;
+		_audioLoaded = 0;
+
+		try
+		{
+			Paths.inst(song.song);
+			_audioLoaded++;
+			if (song.needsVoices)
+			{
+				Paths.voices(song.song);
+				_audioLoaded++;
+			}
+		}
+		catch(e:Dynamic)
+		{
+			trace('[LoadingState] Audio error: $e');
+			_audioLoaded = _audioTotal;
+		}
+
+		_audioReady = true;
+		_tryFinish();
+		return;
+
+		#if false
 		var paths:Array<String> = [Paths.inst(song.song)];
 		if (song.needsVoices) paths.push(Paths.voices(song.song));
 
@@ -126,6 +150,7 @@ class LoadingState extends MusicBeatState
 				}
 			});
 		}
+		#end
 	}
 
 	function _startSpritePreloader():Void

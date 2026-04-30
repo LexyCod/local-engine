@@ -107,26 +107,18 @@ class Character extends FlxSprite
 
 			default:
 				var characterPath:String = 'characters/$curCharacter.json';
+				var rawJson:String = Paths.getTextFromFile(characterPath);
 
-				var path:String = Paths.getPath(characterPath, TEXT, null, true);
-				#if MODS_ALLOWED
-				if (!FileSystem.exists(path))
-				#else
-				if (!Assets.exists(path))
-				#end
+				if (rawJson == null)
 				{
-					path = Paths.getSharedPath('characters/' + DEFAULT_CHARACTER + '.json'); //If a character couldn't be found, change him to BF just to prevent a crash
+					rawJson = Paths.getTextFromFile('characters/' + DEFAULT_CHARACTER + '.json', true); //If a character couldn't be found, change him to BF just to prevent a crash
 					color = FlxColor.BLACK;
 					alpha = 0.6;
 				}
 
 				try
 				{
-					#if MODS_ALLOWED
-					loadCharacterFile(Json.parse(File.getContent(path)));
-					#else
-					loadCharacterFile(Json.parse(Assets.getText(path)));
-					#end
+					loadCharacterFile(Json.parse(rawJson));
 				}
 				catch(e:Dynamic)
 				{
@@ -152,8 +144,7 @@ class Character extends FlxSprite
 		isAnimateAtlas = false;
 
 		#if flxanimate
-		var animToFind:String = Paths.getPath('images/' + json.image + '/Animation.json', TEXT, null, true);
-		if (#if MODS_ALLOWED FileSystem.exists(animToFind) || #end Assets.exists(animToFind))
+		if (Paths.fileExists('images/' + json.image + '/Animation.json', TEXT))
 			isAnimateAtlas = true;
 		#end
 
@@ -162,7 +153,8 @@ class Character extends FlxSprite
 
 		if(!isAnimateAtlas)
 		{
-			frames = Paths.getAtlas(json.image);
+			var cachedFrames = LocalAtlasTextures.getAuto(json.image, 'characters');
+			frames = cachedFrames != null ? cachedFrames : Paths.getAtlas(json.image);
 		}
 		#if flxanimate
 		else

@@ -3,6 +3,7 @@ package states.editors;
 import backend.Song;
 import backend.Section;
 import backend.Rating;
+import backend.NotePool;
 
 import objects.Note;
 import objects.NoteSplash;
@@ -33,6 +34,7 @@ class EditorPlayState extends MusicBeatSubstate
 	
 	var notes:FlxTypedGroup<Note>;
 	var unspawnNotes:Array<Note> = [];
+	var notePool:NotePool;
 	var ratingsData:Array<Rating> = Rating.loadDefault();
 	
 	var strumLineNotes:FlxTypedGroup<StrumNote>;
@@ -94,6 +96,7 @@ class EditorPlayState extends MusicBeatSubstate
 		cachePopUpScore();
 		guitarHeroSustains = ClientPrefs.data.guitarHeroSustains;
 		if(ClientPrefs.data.hitsoundVolume > 0) Paths.sound('hitsound');
+		notePool = new NotePool(0, 8192);
 
 		/* setting up Editor PlayState stuff */
 		var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
@@ -177,12 +180,9 @@ class EditorPlayState extends MusicBeatSubstate
 
 			while (unspawnNotes.length > 0 && unspawnNotes[0].strumTime - Conductor.songPosition < time)
 			{
-				var dunceNote:Note = unspawnNotes[0];
+				var dunceNote:Note = unspawnNotes.shift();
 				notes.insert(0, dunceNote);
 				dunceNote.spawned = true;
-
-				var index:Int = unspawnNotes.indexOf(dunceNote);
-				unspawnNotes.splice(index, 1);
 			}
 		}
 
@@ -273,6 +273,7 @@ class EditorPlayState extends MusicBeatSubstate
 		FlxG.stage.removeEventListener(KeyboardEvent.KEY_DOWN, onKeyPress);
 		FlxG.stage.removeEventListener(KeyboardEvent.KEY_UP, onKeyRelease);
 		FlxG.mouse.visible = true;
+		if (notePool != null) { notePool.destroy(); notePool = null; }
 		super.destroy();
 	}
 	
@@ -373,7 +374,7 @@ class EditorPlayState extends MusicBeatSubstate
 				else
 					oldNote = null;
 
-				var swagNote:Note = new Note(daStrumTime, daNoteData, oldNote, this);
+				var swagNote:Note = notePool.get(daStrumTime, daNoteData, oldNote, false, true, this);
 				swagNote.mustPress = gottaHitNote;
 				swagNote.sustainLength = songNotes[2];
 				//swagNote.gfNote = (section.gfSection && (songNotes[1]<4));
@@ -392,7 +393,7 @@ class EditorPlayState extends MusicBeatSubstate
 					{
 						oldNote = unspawnNotes[Std.int(unspawnNotes.length - 1)];
 
-						var sustainNote:Note = new Note(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true, this);
+						var sustainNote:Note = notePool.get(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true, true, this);
 						sustainNote.mustPress = gottaHitNote;
 						//sustainNote.gfNote = (section.gfSection && (songNotes[1]<4));
 						sustainNote.noteType = swagNote.noteType;
@@ -910,9 +911,8 @@ class EditorPlayState extends MusicBeatSubstate
 	}
 
 	public function invalidateNote(note:Note):Void {
-		note.kill();
 		notes.remove(note, true);
-		note.destroy();
+		notePool.recycle(note);
 	}
 
 	function spawnNoteSplashOnNote(note:Note) {
@@ -990,26 +990,9 @@ class EditorPlayState extends MusicBeatSubstate
 	
 	function loadCharacterFile(char:String):CharacterFile {
 		var characterPath:String = 'characters/' + char + '.json';
-		#if MODS_ALLOWED
-		var path:String = Paths.modFolders(characterPath);
-		if (!FileSystem.exists(path)) {
-			path = Paths.getSharedPath(characterPath);
-		}
-
-		if (!FileSystem.exists(path))
-		#else
-		var path:String = Paths.getSharedPath(characterPath);
-		if (!OpenFlAssets.exists(path))
-		#end
-		{
-			path = Paths.getSharedPath('characters/' + Character.DEFAULT_CHARACTER + '.json'); //If a character couldn't be found, change him to BF just to prevent a crash
-		}
-
-		#if MODS_ALLOWED
-		var rawJson = File.getContent(path);
-		#else
-		var rawJson = OpenFlAssets.getText(path);
-		#end
+		var rawJson = Paths.getTextFromFile(characterPath);
+		if (rawJson == null)
+			rawJson = Paths.getTextFromFile('characters/' + Character.DEFAULT_CHARACTER + '.json', true);
 		return cast Json.parse(rawJson);
 	}
 }

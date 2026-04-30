@@ -56,6 +56,13 @@
       "version": null
     },
     {
+      "name": "hxopus",
+      "type": "git",
+      "dir": null,
+      "ref": "main",
+      "url": "https://github.com/Vortex2Oblivion/hxopus"
+    },
+    {
       "name": "hxdiscord_rpc",
       "type": "git",
       "dir": null,

@@ -21,7 +21,7 @@ class NotePool
 	public var totalCreated(default, null):Int = 0;
 	public var totalReused(default, null):Int = 0;
 
-	public function new(initialSize:Int = 64, maxSize:Int = 256)
+	public function new(initialSize:Int = 64, maxSize:Int = 8192)
 	{
 		_maxSize = maxSize;
 
@@ -65,7 +65,9 @@ class NotePool
 			#if (debug || dev)
 			trace('[NotePool] WARNING: pool max ($_maxSize), overflow #$_overflow');
 			#end
-			return new Note(strumTime, noteData, prevNote, sustainNote, inEditor, createdFrom);
+			note = new Note(strumTime, noteData, prevNote, sustainNote, inEditor, createdFrom);
+			_active.push(note);
+			return note;
 		}
 
 		note.reinit(strumTime, noteData, prevNote, sustainNote, inEditor, createdFrom);
@@ -79,7 +81,7 @@ class NotePool
 		if (!_active.remove(note)) return;
 
 		note.kill();
-		_free.push(note);
+		storeOrDestroy(note);
 	}
 
 	public function recycleAll():Void
@@ -89,9 +91,17 @@ class NotePool
 			var note = _active.pop();
 			if (note != null) {
 				note.kill();
-				_free.push(note);
+				storeOrDestroy(note);
 			}
 		}
+	}
+
+	function storeOrDestroy(note:Note):Void
+	{
+		if (_free.length < _maxSize)
+			_free.push(note);
+		else
+			note.destroy();
 	}
 
 	public function getStats():String

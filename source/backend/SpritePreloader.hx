@@ -81,26 +81,11 @@ class SpritePreloader
 	function _scanCharacter(charName:String):Void
 	{
 		try {
-			var charPath:String = null;
-			#if (MODS_ALLOWED && sys)
-			var modPath = Paths.modFolders('characters/$charName.json');
-			if (sys.FileSystem.exists(modPath)) charPath = modPath;
-			#end
-			if (charPath == null) {
-				var sp = Paths.getSharedPath('characters/$charName.json');
-				if (Assets.exists(sp)) charPath = sp;
-			}
-			if (charPath == null) {
+			var txt:String = Paths.getTextFromFile('characters/$charName.json');
+			if (txt == null) {
 				#if debug trace('[SpritePreloader] Character not found: $charName'); #end
 				return;
 			}
-
-			var txt:String;
-			#if sys
-			txt = sys.io.File.getContent(charPath);
-			#else
-			txt = Assets.getText(charPath);
-			#end
 
 			var data:Dynamic = haxe.Json.parse(txt);
 			if (data == null || data.image == null) return;
@@ -121,23 +106,8 @@ class SpritePreloader
 	function _scanStage(stageName:String):Void
 	{
 		try {
-			var stagePath:String = null;
-			#if (MODS_ALLOWED && sys)
-			var modPath = Paths.modFolders('stages/$stageName.json');
-			if (sys.FileSystem.exists(modPath)) stagePath = modPath;
-			#end
-			if (stagePath == null) {
-				var sp = Paths.getSharedPath('stages/$stageName.json');
-				if (Assets.exists(sp)) stagePath = sp;
-			}
-			if (stagePath == null) return;
-
-			var txt:String;
-			#if sys
-			txt = sys.io.File.getContent(stagePath);
-			#else
-			txt = Assets.getText(stagePath);
-			#end
+			var txt:String = Paths.getTextFromFile('stages/$stageName.json');
+			if (txt == null) return;
 
 			var data:Dynamic = haxe.Json.parse(txt);
 			if (data == null || data.objects == null) return;
@@ -152,28 +122,9 @@ class SpritePreloader
 
 	function _enqueueAuto(key:String):Void
 	{
-		var xmlShared = Paths.getSharedPath('images/$key.xml');
-		#if (MODS_ALLOWED && sys)
-		var xmlMod = Paths.modFolders('images/$key.xml');
-		if (sys.FileSystem.exists(xmlMod)) { _queue.push({path:key, type:SPARROW}); return; }
-		#end
-		if (Assets.exists(xmlShared)) { _queue.push({path:key, type:SPARROW}); return; }
-
-		// TXT (Packer)
-		var txtShared = Paths.getSharedPath('images/$key.txt');
-		#if (MODS_ALLOWED && sys)
-		var txtMod = Paths.modFolders('images/$key.txt');
-		if (sys.FileSystem.exists(txtMod)) { _queue.push({path:key, type:PACKER}); return; }
-		#end
-		if (Assets.exists(txtShared)) { _queue.push({path:key, type:PACKER}); return; }
-
-		// PNG
-		var pngShared = Paths.getSharedPath('images/$key.png');
-		#if (MODS_ALLOWED && sys)
-		var pngMod = Paths.modFolders('images/$key.png');
-		if (sys.FileSystem.exists(pngMod)) { _queue.push({path:key, type:IMAGE}); return; }
-		#end
-		if (Assets.exists(pngShared)) { _queue.push({path:key, type:IMAGE}); return; }
+		if (Paths.fileExists('images/$key.xml', TEXT)) { _queue.push({path:key, type:SPARROW}); return; }
+		if (Paths.fileExists('images/$key.txt', TEXT)) { _queue.push({path:key, type:PACKER}); return; }
+		if (Paths.fileExists('images/$key.png', IMAGE)) { _queue.push({path:key, type:IMAGE}); return; }
 
 		#if debug trace('[SpritePreloader] skiped (not found): $key'); #end
 	}

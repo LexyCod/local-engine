@@ -22,6 +22,7 @@ class CoolUtil
 		var formatted:Array<String> = path.split(':'); //prevent "shared:", "preload:" and other library names on file path
 		path = formatted[formatted.length-1];
 		if(FileSystem.exists(path)) daList = File.getContent(path);
+		else daList = Paths.getTextFromFile(path);
 		#else
 		if(Assets.exists(path)) daList = Assets.getText(path);
 		#end

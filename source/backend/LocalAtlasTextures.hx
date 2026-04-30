@@ -8,6 +8,8 @@ import flixel.graphics.frames.FlxAtlasFrames;
 import flxanimate.FlxAnimate;
 #end
 
+using StringTools;
+
 typedef AtlasEntry = {
 	var key:String;
 	var group:String;
@@ -39,18 +41,18 @@ class LocalAtlasTextures
 	public static function init():Void
 	{
 		_defineGroup('notes', [
-			'images/notes/NOTE_assets',
-			'images/notes/noteSplashes',
-			'images/notes/NOTE_hold_assets',
+			'noteSkins/NOTE_assets',
+			'noteSplashes/noteSplashes',
+			'noteSkins/NOTE_hold_assets',
 		], true);
 
 		_defineGroup('gameplay_ui', [
-			'images/ui/sick', 'images/ui/good',
-			'images/ui/bad',  'images/ui/shit',
-			'images/ui/num0', 'images/ui/num1', 'images/ui/num2',
-			'images/ui/num3', 'images/ui/num4', 'images/ui/num5',
-			'images/ui/num6', 'images/ui/num7', 'images/ui/num8',
-			'images/ui/num9', 'images/healthBar',
+			'sick', 'good',
+			'bad',  'shit',
+			'num0', 'num1', 'num2',
+			'num3', 'num4', 'num5',
+			'num6', 'num7', 'num8',
+			'num9', 'healthBar',
 		], true);
 
 		#if debug
@@ -248,28 +250,34 @@ class LocalAtlasTextures
 
 	static function _detectFormat(path:String):AtlasFormat
 	{
-		var animPath = Paths.getPath('$path/Animation.json', TEXT);
-		if (openfl.utils.Assets.exists(animPath)) return ANIMATE;
+		var key = _imageKey(path);
+		if (Paths.fileExists('images/$key/Animation.json', TEXT)) return ANIMATE;
 
-		var xmlPath = Paths.getPath('$path.xml', TEXT);
-		if (openfl.utils.Assets.exists(xmlPath)) return SPARROW;
+		if (Paths.fileExists('images/$key.xml', TEXT)) return SPARROW;
 
-		var txtPath = Paths.getPath('$path.txt', TEXT);
-		if (openfl.utils.Assets.exists(txtPath)) return PACKER;
+		if (Paths.fileExists('images/$key.txt', TEXT)) return PACKER;
 
 		return SPARROW;
 	}
 
 	static function _resolveAnimatePath(folderPath:String):String
 	{
-		var modPath = Paths.getPath('$folderPath/Animation.json', TEXT);
-		if (openfl.utils.Assets.exists(modPath))
+		var key = _imageKey(folderPath);
+		var animPath = Paths.getPath('images/$key/Animation.json', TEXT);
+		if (openfl.utils.Assets.exists(animPath))
 		{
-			var parts = modPath.split('/');
+			var parts = animPath.split('/');
 			parts.pop();
 			return parts.join('/');
 		}
 		return folderPath;
+	}
+
+	static function _imageKey(path:String):String
+	{
+		if (path == null) return '';
+		while (path.startsWith('images/')) path = path.substr(7);
+		return path;
 	}
 
 	static function _defineGroup(name:String, paths:Array<String>, pinned:Bool):Void

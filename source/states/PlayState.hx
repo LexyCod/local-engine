@@ -398,7 +398,7 @@ class PlayState extends MusicBeatState
 		gfGroup = new FlxSpriteGroup(GF_X, GF_Y);
 
 		// NotePool
-		notePool = new NotePool(64, 256);
+		notePool = new NotePool(0, 8192);
 
 		// CacheManager WIP
 		CacheManager.pin("shared/notes");
@@ -1333,12 +1333,7 @@ class PlayState extends MusicBeatState
 		// NEW SHIT
 		noteData = songData.notes;
 
-		var file:String = Paths.json(songName + '/events');
-		#if MODS_ALLOWED
-		if (FileSystem.exists(Paths.modsJson(songName + '/events')) || FileSystem.exists(file))
-		#else
-		if (OpenFlAssets.exists(file))
-		#end
+		if (Paths.getTextFromFile('data/$songName/events.json') != null)
 		{
 			var eventsData:Array<Dynamic> = Song.loadFromJson('events', songName).events;
 			for (event in eventsData) //Event Notes
@@ -1786,15 +1781,12 @@ class PlayState extends MusicBeatState
 
 			while (unspawnNotes.length > 0 && unspawnNotes[0].strumTime - Conductor.songPosition < time)
 			{
-				var dunceNote:Note = unspawnNotes[0];
+				var dunceNote:Note = unspawnNotes.shift();
 				notes.insert(0, dunceNote);
 				dunceNote.spawned = true;
 
 				callOnLuas('onSpawnNote', [notes.members.indexOf(dunceNote), dunceNote.noteData, dunceNote.noteType, dunceNote.isSustainNote, dunceNote.strumTime]);
 				callOnHScript('onSpawnNote', [dunceNote]);
-
-				var index:Int = unspawnNotes.indexOf(dunceNote);
-				unspawnNotes.splice(index, 1);
 			}
 		}
 
@@ -2473,6 +2465,12 @@ class PlayState extends MusicBeatState
 			daNote.active = false;
 			daNote.visible = false;
 			invalidateNote(daNote);
+		}
+		for (daNote in unspawnNotes)
+		{
+			daNote.active = false;
+			daNote.visible = false;
+			notePool.recycle(daNote);
 		}
 		unspawnNotes = [];
 		eventNotes = [];

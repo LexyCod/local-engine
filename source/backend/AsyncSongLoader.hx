@@ -116,23 +116,9 @@ class AsyncSongLoader
 	{
 		var formatSong = Paths.formatToSongPath(songName);
 
-		var instPath = Paths.inst(songName);
-		if (OpenFlAssets.exists(instPath, SOUND))
-		{
-			OpenFlAssets.getSound(instPath);
-		}
-
-		var voicesPath = Paths.voices(songName);
-		if (OpenFlAssets.exists(voicesPath, SOUND))
-		{
-			OpenFlAssets.getSound(voicesPath);
-		}
-
-		var chartPath = Paths.json('${formatSong}/${formatSong}');
-		if (OpenFlAssets.exists(chartPath, TEXT))
-		{
-			OpenFlAssets.getText(chartPath);
-		}
+		Paths.inst(songName);
+		Paths.voices(songName);
+		Paths.getTextFromFile('data/$formatSong/$formatSong.json');
 
 		_mutex.acquire();
 		_states.set(key, Ready);

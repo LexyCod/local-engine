@@ -117,6 +117,7 @@
 	<haxelib name="flixel-ui" />
 	<haxelib name="flixel-addons" />
 	<haxelib name="tjson" />
+	<haxelib name="hxopus" if="cpp" />
 
 	<!--Psych stuff needed-->
 	<haxelib name="linc_luajit" if="LUA_ALLOWED"/>

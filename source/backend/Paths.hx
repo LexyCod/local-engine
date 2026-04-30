@@ -9,20 +9,25 @@ import openfl.display.BitmapData;
 import openfl.display3D.textures.RectangleTexture;
 import openfl.utils.AssetType;
 import openfl.utils.Assets as OpenFlAssets;
+import openfl.utils.ByteArray;
 import openfl.system.System;
 import openfl.geom.Rectangle;
+import openfl.media.Sound;
 
 import lime.utils.Assets;
-import flash.media.Sound;
 
 import haxe.Json;
+import haxe.io.Bytes;
 
 
 #if MODS_ALLOWED
 import backend.Mods;
 #end
 import backend.CacheManager;
-//import backend.ZipModManager;
+import backend.AudioBackend;
+#if MODS_ALLOWED
+import backend.ZipModManager;
+#end
 
 class Paths
 {
@@ -34,24 +39,30 @@ class Paths
 			dumpExclusions.push(key);
 	}
 
-	/*
+	#if MODS_ALLOWED
 	static function extractZipModPath(key:String):Dynamic {
+		key = normalizePath(key);
 		if (key.indexOf('mods/') == 0) {
-			var huina = key.substr(5);
-			var parts = huina.split('/');
+			var modPath = key.substr(5);
+			var parts = modPath.split('/');
 			var modName = parts[0];
 
-			if (modName!=''&&Mods.getModDirectories().contains(modName)) {
-				var modDir = Paths.mods(modName);
-				if (!FileSystem.exists(modDir) || !FileSystem.isDirectory(modDir)) {
-					var inner = huina.substr(modName.length + 1);
-					return {modName: modName, innerPath: inner};
-				}
+			if (modName != '' && parts.length > 1 && ZipModManager.hasZip(modName)) {
+				var inner = modPath.substr(modName.length + 1);
+				return {modName: modName, innerPath: inner};
 			}
 		}
 		return null;
 	}
-	*/
+	#end
+
+	static function normalizePath(key:String):String
+	{
+		if (key == null) return '';
+		key = key.replace('\\', '/');
+		while (key.startsWith('./')) key = key.substr(2);
+		return key;
+	}
 
 	public static var dumpExclusions:Array<String> = ['assets/shared/music/freakyMenu.$SOUND_EXT'];
 	/// haya I love you for the base cache dump I took to the max
@@ -242,16 +253,24 @@ class Paths
 		var file:String = null;
 
 		#if MODS_ALLOWED
-		file = modsImages(key);
+		var modImageKey = 'images/$key.png';
+		file = getModAssetId(modImageKey);
 		if (currentTrackedAssets.exists(file))
 		{
 			localTrackedAssets.push(file);
 			return currentTrackedAssets.get(file);
 		}
-		else if (FileSystem.exists(file))
-			bitmap = BitmapData.fromFile(file);
 		else
+			bitmap = bitmapFromBytes(getModFileBytes(modImageKey));
+
+		if (bitmap == null && FileSystem.exists(modsImages(key)))
+		{
+			file = modsImages(key);
+			bitmap = BitmapData.fromFile(file);
+		}
 		#end
+
+		if (bitmap == null)
 		{
 			file = getPath('images/$key.png', IMAGE, library);
 			if (currentTrackedAssets.exists(file))
@@ -281,7 +300,14 @@ class Paths
 			if (FileSystem.exists(file))
 				bitmap = BitmapData.fromFile(file);
 			else
+			{
+				var zipInfo = extractZipModPath(file);
+				if (zipInfo != null)
+					bitmap = bitmapFromBytes(ZipModManager.getBytes(zipInfo.modName, zipInfo.innerPath));
+			}
 			#end
+
+			if (bitmap == null)
 			{
 				if (OpenFlAssets.exists(file, IMAGE))
 					bitmap = OpenFlAssets.getBitmapData(file);
@@ -308,18 +334,31 @@ class Paths
 		return newGraphic;
 	}
 
+	static function bitmapFromBytes(bytes:Bytes):BitmapData
+	{
+		return bytes != null ? BitmapData.fromBytes(ByteArray.fromBytes(bytes)) : null;
+	}
+
 	static public function getTextFromFile(key:String, ?ignoreMods:Bool = false):String
 	{
+		key = normalizePath(key);
 		#if sys
 		#if MODS_ALLOWED
-		/*
 		if (!ignoreMods) {
 			var zipInfo = extractZipModPath(key);
 			if (zipInfo != null && ZipModManager.exists(zipInfo.modName, zipInfo.innerPath)) {
 				return ZipModManager.getText(zipInfo.modName, zipInfo.innerPath);
 			}
 		}
-		*/
+
+		if (!ignoreMods) {
+			var modText = getModFileText(key);
+			if (modText != null) return modText;
+		}
+
+		if (FileSystem.exists(key))
+			return File.getContent(key);
+
 		if (!ignoreMods && FileSystem.exists(modFolders(key)))
 			return File.getContent(modFolders(key));
 		#end
@@ -339,6 +378,7 @@ class Paths
 		#end
 		var path:String = getPath(key, TEXT);
 		if(OpenFlAssets.exists(path, TEXT)) return Assets.getText(path);
+		if(OpenFlAssets.exists(key, TEXT)) return Assets.getText(key);
 		return null;
 	}
 
@@ -358,6 +398,9 @@ class Paths
 		#if MODS_ALLOWED
 		if(!ignoreMods)
 		{
+			if (modFileExists(key))
+				return true;
+
 			for(mod in Mods.getGlobalMods())
 				if (FileSystem.exists(mods('$mod/$key')))
 					return true;
@@ -376,78 +419,63 @@ class Paths
 		return false;
 	}
 
+	static function getImageText(key:String, extension:String, ?library:String = null):String
+	{
+		var relativePath = 'images/$key.$extension';
+		#if MODS_ALLOWED
+		var modText = getModFileText(relativePath);
+		if (modText != null) return modText;
+		#end
+
+		#if sys
+		var sharedPath = getSharedPath(relativePath);
+		if (FileSystem.exists(sharedPath)) return File.getContent(sharedPath);
+		#end
+
+		var assetPath = getPath(relativePath, TEXT, library);
+		if (OpenFlAssets.exists(assetPath, TEXT)) return OpenFlAssets.getText(assetPath);
+		return null;
+	}
+
 	static public function getAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
-		var useMod = false;
 		var imageLoaded:FlxGraphic = image(key, library, allowGPU);
 
-		var myXml:Dynamic = getPath('images/$key.xml', TEXT, library, true);
-		if(OpenFlAssets.exists(myXml) #if MODS_ALLOWED || (FileSystem.exists(myXml) && (useMod = true)) #end )
+		var myXml:String = getImageText(key, 'xml', library);
+		if(myXml != null)
 		{
-			#if MODS_ALLOWED
-			return FlxAtlasFrames.fromSparrow(imageLoaded, (useMod ? File.getContent(myXml) : myXml));
-			#else
 			return FlxAtlasFrames.fromSparrow(imageLoaded, myXml);
-			#end
 		}
 		else
 		{
-			var myJson:Dynamic = getPath('images/$key.json', TEXT, library, true);
-			if(OpenFlAssets.exists(myJson) #if MODS_ALLOWED || (FileSystem.exists(myJson) && (useMod = true)) #end )
+			var myJson:String = getImageText(key, 'json', library);
+			if(myJson != null)
 			{
-				#if MODS_ALLOWED
-				return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, (useMod ? File.getContent(myJson) : myJson));
-				#else
 				return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, myJson);
-				#end
 			}
 		}
 		return getPackerAtlas(key, library);
 	}
 
-	inline static public function getSparrowAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
+	static public function getSparrowAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, library, allowGPU);
-		#if MODS_ALLOWED
-		var xmlExists:Bool = false;
-
-		var xml:String = modsXml(key);
-		if(FileSystem.exists(xml)) xmlExists = true;
-
-		return FlxAtlasFrames.fromSparrow(imageLoaded, (xmlExists ? File.getContent(xml) : getPath('images/$key.xml', library)));
-		#else
-		return FlxAtlasFrames.fromSparrow(imageLoaded, getPath('images/$key.xml', library));
-		#end
+		var xml = getImageText(key, 'xml', library);
+		return FlxAtlasFrames.fromSparrow(imageLoaded, xml != null ? xml : getPath('images/$key.xml', TEXT, library));
 	}
 
-	inline static public function getPackerAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
+	static public function getPackerAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, library, allowGPU);
-		#if MODS_ALLOWED
-		var txtExists:Bool = false;
-		
-		var txt:String = modsTxt(key);
-		if(FileSystem.exists(txt)) txtExists = true;
-
-		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, (txtExists ? File.getContent(txt) : getPath('images/$key.txt', library)));
-		#else
-		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, getPath('images/$key.txt', library));
-		#end
+		var txt = getImageText(key, 'txt', library);
+		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, txt != null ? txt : getPath('images/$key.txt', TEXT, library));
 	}
 
-	inline static public function getAsepriteAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
+	static public function getAsepriteAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, library, allowGPU);
-		#if MODS_ALLOWED
-		var jsonExists:Bool = false;
-
-		var json:String = modsImagesJson(key);
-		if(FileSystem.exists(json)) jsonExists = true;
-
-		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, (jsonExists ? File.getContent(json) : getPath('images/$key.json', library)));
-		#else
-		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, getPath('images/$key.json', library));
-		#end
+		var json = getImageText(key, 'json', library);
+		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, json != null ? json : getPath('images/$key.json', TEXT, library));
 	}
 
 	inline static public function formatToSongPath(path:String) {
@@ -459,45 +487,153 @@ class Paths
 	}
 
 	public static var currentTrackedSounds:Map<String, Sound> = [];
-	public static function returnSound(path:Null<String>, key:String, ?library:String) {
+	public static function returnSound(path:Null<String>, key:String, ?library:String):Sound {
+		var relativeBase:String = key;
+		if(path != null && path.length > 0) relativeBase = '$path/$key';
+
 		#if MODS_ALLOWED
 		var modLibPath:String = '';
-		if (library != null) modLibPath = '$library/';
-		if (path != null) modLibPath += '$path';
+		if (library != null && library.length > 0) modLibPath = '$library/';
+		if (path != null && path.length > 0) modLibPath += path;
 
-		var file:String = modsSounds(modLibPath, key);
-		if(FileSystem.exists(file)) {
-			if(!currentTrackedSounds.exists(file))
+		var modBase:String = modLibPath.length > 0 ? '$modLibPath/$key' : key;
+		for (extension in AudioBackend.soundExtensions())
+		{
+			var modSoundKey:String = '$modBase.$extension';
+			var asset = findModAsset(modSoundKey);
+			if (asset == null) continue;
+
+			var cacheKey:String = asset.id;
+			if(!currentTrackedSounds.exists(cacheKey))
 			{
-				currentTrackedSounds.set(file, Sound.fromFile(file));
-				//trace('precached mod sound: $file');
+				var sound:Sound = asset.isZip
+					? AudioBackend.fromBytes(ZipModManager.getBytes(asset.modName, asset.innerPath), cacheKey)
+					: AudioBackend.fromFile(asset.file);
+				if (sound != null)
+					currentTrackedSounds.set(cacheKey, sound);
 			}
-			localTrackedAssets.push(file);
-			return currentTrackedSounds.get(file);
+
+			if(currentTrackedSounds.exists(cacheKey))
+			{
+				localTrackedAssets.push(cacheKey);
+				return currentTrackedSounds.get(cacheKey);
+			}
 		}
 		#end
 
-		// I hate this so god damn much
-		var gottenPath:String = '$key.$SOUND_EXT';
-		if(path != null) gottenPath = '$path/$gottenPath';
-		gottenPath = getPath(gottenPath, SOUND, library);
-		gottenPath = gottenPath.substring(gottenPath.indexOf(':') + 1, gottenPath.length);
-		// trace(gottenPath);
-		if(!currentTrackedSounds.exists(gottenPath))
+		for (extension in AudioBackend.soundExtensions())
 		{
-			var retKey:String = (path != null) ? '$path/$key' : key;
-			retKey = ((path == 'songs') ? 'songs:' : '') + getPath('$retKey.$SOUND_EXT', SOUND, library);
-			if(OpenFlAssets.exists(retKey, SOUND))
+			var assetPath:String = getPath('$relativeBase.$extension', SOUND, library);
+			var cacheKey:String = assetPath;
+			if (cacheKey.indexOf(':') >= 0)
+				cacheKey = cacheKey.substring(cacheKey.indexOf(':') + 1, cacheKey.length);
+
+			if(!currentTrackedSounds.exists(cacheKey))
 			{
-				currentTrackedSounds.set(gottenPath, OpenFlAssets.getSound(retKey));
-				//trace('precached vanilla sound: $retKey');
+				var sound:Sound = null;
+
+				try
+				{
+					if(!AudioBackend.isOpusPath(assetPath) && OpenFlAssets.exists(assetPath, SOUND))
+						sound = OpenFlAssets.getSound(assetPath);
+					else if(OpenFlAssets.exists(assetPath, BINARY) || OpenFlAssets.exists(assetPath, SOUND))
+						sound = AudioBackend.fromBytes(OpenFlAssets.getBytes(assetPath), assetPath);
+				}
+				catch(e:Dynamic)
+				{
+					#if (debug || dev) trace('[Paths] Could not load sound asset "$assetPath": $e'); #end
+				}
+
+				#if sys
+				if(sound == null)
+				{
+					var filePath:String = assetPath;
+					if (filePath.indexOf(':') >= 0)
+						filePath = filePath.substring(filePath.indexOf(':') + 1, filePath.length);
+					if(FileSystem.exists(filePath))
+						sound = AudioBackend.fromFile(filePath);
+				}
+				#end
+
+				if(sound != null)
+					currentTrackedSounds.set(cacheKey, sound);
+			}
+
+			if(currentTrackedSounds.exists(cacheKey))
+			{
+				localTrackedAssets.push(cacheKey);
+				return currentTrackedSounds.get(cacheKey);
 			}
 		}
-		localTrackedAssets.push(gottenPath);
-		return currentTrackedSounds.get(gottenPath);
+		return null;
 	}
 
 	#if MODS_ALLOWED
+	static function findModAsset(key:String, ?folder:String):Dynamic
+	{
+		key = normalizePath(key);
+
+		if (folder != null && folder.length > 0)
+			return findAssetInMod(folder, key);
+
+		if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
+		{
+			var current = findAssetInMod(Mods.currentModDirectory, key);
+			if (current != null) return current;
+		}
+
+		for(mod in Mods.getGlobalMods())
+		{
+			var global = findAssetInMod(mod, key);
+			if (global != null) return global;
+		}
+
+		var looseFile = mods(key);
+		if (FileSystem.exists(looseFile))
+			return {id: looseFile, file: looseFile, isZip: false};
+
+		return null;
+	}
+
+	static function findAssetInMod(mod:String, key:String):Dynamic
+	{
+		if (mod == null || mod.length < 1) return null;
+
+		var file = mods(mod + '/' + key);
+		if (FileSystem.exists(file))
+			return {id: file, file: file, isZip: false};
+
+		if (ZipModManager.exists(mod, key))
+			return {id: 'zip:$mod/$key', modName: mod, innerPath: key, isZip: true};
+
+		return null;
+	}
+
+	public static function modFileExists(key:String, ?folder:String):Bool
+	{
+		return findModAsset(key, folder) != null;
+	}
+
+	public static function getModFileBytes(key:String, ?folder:String):Bytes
+	{
+		var asset = findModAsset(key, folder);
+		if (asset == null) return null;
+		return asset.isZip ? ZipModManager.getBytes(asset.modName, asset.innerPath) : File.getBytes(asset.file);
+	}
+
+	public static function getModFileText(key:String, ?folder:String):String
+	{
+		var asset = findModAsset(key, folder);
+		if (asset == null) return null;
+		return asset.isZip ? ZipModManager.getText(asset.modName, asset.innerPath) : File.getContent(asset.file);
+	}
+
+	static function getModAssetId(key:String, ?folder:String):String
+	{
+		var asset = findModAsset(key, folder);
+		return asset != null ? asset.id : mods(key);
+	}
+
 	inline static public function mods(key:String = '') {
 		return 'mods/' + key;
 	}
