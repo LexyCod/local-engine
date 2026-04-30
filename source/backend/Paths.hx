@@ -588,6 +588,13 @@ class Paths
 			if (global != null) return global;
 		}
 
+		for(mod in Mods.getModDirectories())
+		{
+			if (mod == Mods.currentModDirectory || Mods.getGlobalMods().contains(mod)) continue;
+			var discovered = findAssetInMod(mod, key);
+			if (discovered != null) return discovered;
+		}
+
 		var looseFile = mods(key);
 		if (FileSystem.exists(looseFile))
 			return {id: looseFile, file: looseFile, isZip: false};

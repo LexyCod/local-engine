@@ -142,6 +142,8 @@ class Character extends FlxSprite
 	public function loadCharacterFile(json:Dynamic)
 	{
 		isAnimateAtlas = false;
+		if (json == null) return;
+		if (json.image == null || ('' + json.image).length < 1) json.image = 'characters/BOYFRIEND';
 
 		#if flxanimate
 		if (Paths.fileExists('images/' + json.image + '/Animation.json', TEXT))
@@ -173,19 +175,19 @@ class Character extends FlxSprite
 		#end
 
 		imageFile = json.image;
-		jsonScale = json.scale;
-		if(json.scale != 1) {
+		jsonScale = json.scale != null ? json.scale : 1;
+		if(jsonScale != 1) {
 			scale.set(jsonScale, jsonScale);
 			updateHitbox();
 		}
 
 		// positioning
-		positionArray = json.position;
-		cameraPosition = json.camera_position;
+		positionArray = json.position != null ? json.position : [0, 0];
+		cameraPosition = json.camera_position != null ? json.camera_position : [0, 0];
 
 		// data
-		healthIcon = json.healthicon;
-		singDuration = json.sing_duration;
+		healthIcon = json.healthicon != null ? json.healthicon : 'face';
+		singDuration = json.sing_duration != null ? json.sing_duration : 4;
 		flipX = (json.flip_x != isPlayer);
 		healthColorArray = (json.healthbar_colors != null && json.healthbar_colors.length > 2) ? json.healthbar_colors : [161, 161, 161];
 		vocalsFile = json.vocals_file != null ? json.vocals_file : '';
@@ -197,7 +199,7 @@ class Character extends FlxSprite
 		antialiasing = ClientPrefs.data.antialiasing ? !noAntialiasing : false;
 
 		// animations
-		animationsArray = json.animations;
+		animationsArray = json.animations != null ? json.animations : [];
 		if(animationsArray != null && animationsArray.length > 0) {
 			for (anim in animationsArray) {
 				var animAnim:String = '' + anim.anim;
@@ -239,6 +241,7 @@ class Character extends FlxSprite
 
 		if(debugMode || (!isAnimateAtlas && animation.curAnim == null) || (isAnimateAtlas && atlas.anim.curSymbol == null))
 		{
+			if(debugMode) updateHoldLoopState();
 			super.update(elapsed);
 			return;
 		}
@@ -295,45 +298,13 @@ class Character extends FlxSprite
 			holdTimer = 0;
 		}
 
-		if (curAnimName.startsWith('sing') && !curAnimName.endsWith('miss'))
-		{
-			var animData = getAnimData(curAnimName);
-			if (animData != null)
-			{
-				var ht = animData.hold_type;
-				if (ht == 'static')
-				{
-					if (!isAnimateAtlas && animation.curAnim != null)
-					{
-						var targetFrame:Int = animData.hold_static_frame ?? (animation.curAnim.frames.length - 1);
-						if (animation.curAnim.curFrame >= targetFrame || animation.curAnim.finished)
-						{
-							animation.curAnim.curFrame = targetFrame;
-						}
-					}
-				}
-				else if (ht == 'loop2frame')
-				{
-					if (!isAnimateAtlas && animation.curAnim != null)
-					{
-						var loopStart:Int = animData.hold_loop_start ?? 0;
-						var loopEnd:Int   = animData.hold_loop_end   ?? 1;
-						if (loopEnd >= animation.curAnim.frames.length)
-							loopEnd = animation.curAnim.frames.length - 1;
-						if (animation.curAnim.curFrame >= loopEnd || animation.curAnim.finished)
-						{
-							animation.curAnim.curFrame = loopStart;
-						}
-					}
-				}
-			}
-		}
+		updateHoldLoopState();
 		var wasHolding = _holdActive;
 		_holdActive = curAnimName.startsWith('sing') && !curAnimName.endsWith('miss');
 		if (wasHolding && !_holdActive && _holdAnimName.length > 0)
 		{
 			var prevData = getAnimData(_holdAnimName);
-			if (prevData != null && prevData.hold_end_anim != null && animOffsets.exists(prevData.hold_end_anim))
+			if (prevData != null && prevData.hold_end_anim != null && hasAnimation(prevData.hold_end_anim))
 			{
 				playAnim(prevData.hold_end_anim, true);
 				specialAnim = true;
@@ -341,7 +312,7 @@ class Character extends FlxSprite
 		}
 		_holdAnimName = _holdActive ? curAnimName : '';
 
-		if(isAnimationFinished() && animOffsets.exists('$curAnimName-loop'))
+		if(isAnimationFinished() && hasAnimation('$curAnimName-loop'))
 			playAnim('$curAnimName-loop');
 
 		super.update(elapsed);
@@ -350,13 +321,83 @@ class Character extends FlxSprite
 	public function getAnimData(?animName:String):Null<AnimArray>
 	{
 		var name = animName != null ? animName : getAnimationName();
+		if (animationsArray == null) return null;
 		for (a in animationsArray)
 			if (a.anim == name) return a;
 		return null;
 	}
 
+	function updateHoldLoopState():Void
+	{
+		var curAnimName:String = getAnimationName();
+		if (!curAnimName.startsWith('sing') || curAnimName.endsWith('miss')) return;
+
+		var animData = getAnimData(curAnimName);
+		if (animData == null) return;
+
+		var frameCount = getCurrentFrameCount();
+		if (frameCount < 1) return;
+
+		switch(animData.hold_type)
+		{
+			case 'static':
+				var targetFrame:Int = clampAnimFrame(animData.hold_static_frame ?? (frameCount - 1), frameCount);
+				if (getCurrentFrame() >= targetFrame || isAnimationFinished())
+				{
+					setCurrentFrame(targetFrame);
+					animPaused = true;
+				}
+			case 'loop2frame':
+				var loopStart:Int = clampAnimFrame(animData.hold_loop_start ?? 0, frameCount);
+				var loopEnd:Int = clampAnimFrame(animData.hold_loop_end ?? (frameCount - 1), frameCount);
+				if (loopEnd < loopStart) loopEnd = loopStart;
+				if (getCurrentFrame() >= loopEnd || isAnimationFinished())
+				{
+					setCurrentFrame(loopStart);
+					animPaused = false;
+				}
+			default:
+		}
+	}
+
+	public function hasAnimation(name:String):Bool
+	{
+		if (name == null || name.length < 1) return false;
+		if (!isAnimateAtlas) return animation.exists(name);
+		#if flxanimate
+		return atlas != null && atlas.anim != null && @:privateAccess atlas.anim.animsMap.exists(name);
+		#else
+		return false;
+		#end
+	}
+
+	function getCurrentFrameCount():Int
+	{
+		if (isAnimationNull()) return 0;
+		return !isAnimateAtlas ? animation.curAnim.numFrames : atlas.anim.length;
+	}
+
+	function getCurrentFrame():Int
+	{
+		if (isAnimationNull()) return 0;
+		return !isAnimateAtlas ? animation.curAnim.curFrame : atlas.anim.curFrame;
+	}
+
+	function setCurrentFrame(frame:Int):Void
+	{
+		if (isAnimationNull()) return;
+		if (!isAnimateAtlas) animation.curAnim.curFrame = frame;
+		else atlas.anim.curFrame = frame;
+	}
+
+	inline function clampAnimFrame(frame:Int, frameCount:Int):Int
+	{
+		if (frameCount < 1) return 0;
+		return Std.int(Math.max(0, Math.min(frame, frameCount - 1)));
+	}
+
 	inline public function isAnimationNull():Bool
-		return !isAnimateAtlas ? (animation.curAnim == null) : (atlas.anim.curSymbol == null);
+		return !isAnimateAtlas ? (animation.curAnim == null) : (atlas == null || atlas.anim == null || atlas.anim.curSymbol == null);
 
 	inline public function getAnimationName():String
 	{
@@ -384,7 +425,7 @@ class Character extends FlxSprite
 	private function get_animPaused():Bool
 	{
 		if(isAnimationNull()) return false;
-		return !isAnimateAtlas ? animation.curAnim.paused : atlas.anim.isPlaying;
+		return !isAnimateAtlas ? animation.curAnim.paused : !atlas.anim.isPlaying;
 	}
 	private function set_animPaused(value:Bool):Bool
 	{
@@ -425,6 +466,7 @@ class Character extends FlxSprite
 
 	public function playAnim(AnimName:String, Force:Bool = false, Reversed:Bool = false, Frame:Int = 0):Void
 	{
+		if (!hasAnimation(AnimName)) return;
 		specialAnim = false;
 		if(!isAnimateAtlas) animation.play(AnimName, Force, Reversed, Frame);
 		else atlas.anim.play(AnimName, Force, Reversed, Frame);

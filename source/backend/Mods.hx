@@ -167,11 +167,21 @@ class Mods
 				if(mod.trim().length < 1) continue;
 
 				var dat = mod.split("|");
-				list.all.push(dat[0]);
+				var name = dat[0].trim();
+				if(name.length < 1 || !modExists(name)) continue;
+
+				if(!list.all.contains(name)) list.all.push(name);
 				if (dat[1] == "1")
-					list.enabled.push(dat[0]);
+					list.enabled.push(name);
 				else
-					list.disabled.push(dat[0]);
+					list.disabled.push(name);
+			}
+
+			for (mod in getModDirectories())
+			{
+				if(mod.trim().length < 1 || list.all.contains(mod)) continue;
+				list.all.push(mod);
+				list.enabled.push(mod);
 			}
 		} catch(e) {
 			trace(e);

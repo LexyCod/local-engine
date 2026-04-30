@@ -19,6 +19,9 @@ import lime.system.Clipboard;
 import objects.Character;
 import objects.HealthIcon;
 import objects.Bar;
+#if MODS_ALLOWED
+import backend.ZipModManager;
+#end
 
 class CharacterEditorState extends MusicBeatState
 {
@@ -37,6 +40,7 @@ class CharacterEditorState extends MusicBeatState
 	var helpTexts:FlxSpriteGroup;
 	var cameraZoomText:FlxText;
 	var frameAdvanceText:FlxText;
+	var editorInfoText:FlxText;
 
 	var healthBar:Bar;
 	var healthIcon:HealthIcon;
@@ -144,6 +148,7 @@ class CharacterEditorState extends MusicBeatState
 		frameAdvanceText.screenCenter(X);
 		frameAdvanceText.cameras = [camHUD];
 		add(frameAdvanceText);
+		addEditorChrome();
 
 		addHelpScreen();
 		FlxG.mouse.visible = true;
@@ -158,6 +163,42 @@ class CharacterEditorState extends MusicBeatState
 		if(ClientPrefs.data.cacheOnGPU) Paths.clearUnusedMemory();
 
 		super.create();
+	}
+
+	function addEditorChrome():Void
+	{
+		var panel = new FlxSprite(14, 14).makeGraphic(360, 58, 0xCC101820);
+		panel.scrollFactor.set();
+		panel.cameras = [camHUD];
+		add(panel);
+
+		var accent = new FlxSprite(panel.x, panel.y).makeGraphic(5, Std.int(panel.height), 0xFFE9C46A);
+		accent.scrollFactor.set();
+		accent.cameras = [camHUD];
+		add(accent);
+
+		var title = new FlxText(panel.x + 14, panel.y + 7, 330, "LOCAL ENGINE CHARACTER LAB", 14);
+		title.setFormat(null, 14, 0xFFE9C46A, LEFT, OUTLINE_FAST, FlxColor.BLACK);
+		title.scrollFactor.set();
+		title.cameras = [camHUD];
+		add(title);
+
+		editorInfoText = new FlxText(panel.x + 14, panel.y + 29, 330, "", 12);
+		editorInfoText.setFormat(null, 12, FlxColor.WHITE, LEFT, OUTLINE_FAST, FlxColor.BLACK);
+		editorInfoText.scrollFactor.set();
+		editorInfoText.cameras = [camHUD];
+		add(editorInfoText);
+		updateEditorInfo();
+	}
+
+	function updateEditorInfo():Void
+	{
+		if (editorInfoText == null || character == null) return;
+		var animName = character.getAnimationName();
+		if (animName == null || animName.length < 1) animName = "no anim";
+		var animData = character.getAnimData(animName);
+		var holdType = animData != null && animData.hold_type != null ? animData.hold_type : "normal";
+		editorInfoText.text = '${_char}  |  $animName  |  hold: $holdType';
 	}
 
 	function addHelpScreen()
@@ -453,12 +494,7 @@ class CharacterEditorState extends MusicBeatState
 			if(intended == null || intended.length < 1) return;
 
 			var characterPath:String = 'characters/$intended.json';
-			var path:String = Paths.getPath(characterPath, TEXT, null, true);
-			#if MODS_ALLOWED
-			if (FileSystem.exists(path))
-			#else
-			if (Assets.exists(path))
-			#end
+			if (Paths.fileExists(characterPath, TEXT))
 			{
 				_char = intended;
 				check_player.checked = character.isPlayer;
@@ -505,12 +541,13 @@ class CharacterEditorState extends MusicBeatState
 		animationDropDown = new FlxUIDropDownMenu(15, animationInputText.y - 55, FlxUIDropDownMenu.makeStrIdLabelArray([''], true), function(pressed:String) {
 			var selectedAnimation:Int = Std.parseInt(pressed);
 			var anim:AnimArray = character.animationsArray[selectedAnimation];
+			if (anim == null) return;
 			animationInputText.text = anim.anim;
 			animationNameInputText.text = anim.name;
 			animationLoopCheckBox.checked = anim.loop;
 			animationFramerate.value = anim.fps;
 
-			var indicesStr:String = anim.indices.toString();
+			var indicesStr:String = anim.indices != null ? anim.indices.toString() : '[]';
 			animationIndicesInputText.text = indicesStr.substr(1, indicesStr.length - 2);
 		});
 
@@ -731,6 +768,8 @@ class CharacterEditorState extends MusicBeatState
 				character.vocalsFile = vocalsInputText.text;
 			else if(sender == imageInputText)
 				character.imageFile = imageInputText.text;
+			else if(sender == noteLoopsEndAnimInputText)
+				_applyNoteLoopFields();
 		}
 		else if(sender is FlxUINumericStepper)
 		{
@@ -781,6 +820,10 @@ class CharacterEditorState extends MusicBeatState
 				character.healthColorArray[2] = Math.round(healthColorStepperB.value);
 				updateHealthBar();
 			}
+			else if(sender == noteLoopsStaticFrameStepper || sender == noteLoopsLoopStartStepper || sender == noteLoopsLoopEndStepper)
+			{
+				_applyNoteLoopFields();
+			}
 		}
 	}
 
@@ -813,6 +856,7 @@ class CharacterEditorState extends MusicBeatState
 				if (_noteLoopsCurAnim == null) return;
 				var t = holdTypes[Std.parseInt(index)];
 				_noteLoopsCurAnim.hold_type = t == "normal" ? null : t;
+				_applyNoteLoopFields();
 				_updateNoteLoopsVisibility();
 			});
 		tab_group.add(noteLoopsHoldTypeDropDown); y += 26;
@@ -833,12 +877,7 @@ class CharacterEditorState extends MusicBeatState
 		tab_group.add(noteLoopsEndAnimInputText); y += 22;
 
 		var applyBtn = new FlxButton(10, y, "Apply", function() {
-			if (_noteLoopsCurAnim == null) return;
-			_noteLoopsCurAnim.hold_static_frame = Std.int(noteLoopsStaticFrameStepper.value);
-			_noteLoopsCurAnim.hold_loop_start   = Std.int(noteLoopsLoopStartStepper.value);
-			_noteLoopsCurAnim.hold_loop_end     = Std.int(noteLoopsLoopEndStepper.value);
-			_noteLoopsCurAnim.hold_end_anim     = noteLoopsEndAnimInputText.text.length > 0
-				? noteLoopsEndAnimInputText.text : null;
+			_applyNoteLoopFields();
 			FlxG.sound.play(Paths.sound('confirmMenu'));
 		});
 		applyBtn.color = FlxColor.GREEN;
@@ -846,15 +885,15 @@ class CharacterEditorState extends MusicBeatState
 
 		noteLoopsPreviewBtn = new FlxButton(90, y, "Preview (3s)", function() {
 			if (_noteLoopsCurAnim == null) return;
-			if (!character.isAnimateAtlas && character.animation.curAnim != null)
-				character.animation.curAnim.paused = false;
+			_applyNoteLoopFields();
+			character.animPaused = false;
 			character.playAnim(_noteLoopsCurAnim.anim, true);
 			character.holdTimer = 9999;
 			new FlxTimer().start(3.0, function(_) {
-				if (!character.isAnimateAtlas && character.animation.curAnim != null)
-					character.animation.curAnim.paused = false;
+				character.animPaused = false;
 				character.holdTimer = 0;
-				character.dance();
+				if (character.hasAnimation('idle')) character.playAnim('idle', true);
+				else character.dance();
 			});
 		});
 		tab_group.add(applyBtn);
@@ -872,18 +911,33 @@ class CharacterEditorState extends MusicBeatState
 	function _reloadNoteLoopsAnimDropDown():Void
 	{
 		if (noteLoopsAnimDropDown == null || character == null) return;
-		var names = [for (a in character.animationsArray) a.anim];
-		if (names.length == 0) names = [''];
-		noteLoopsAnimDropDown.setData(FlxUIDropDownMenu.makeStrIdLabelArray(names, true));
-		if (character.animationsArray.length > 0) {
-			_noteLoopsCurAnim = character.animationsArray[0];
+		if (character.animationsArray == null || character.animationsArray.length < 1)
+		{
+			_noteLoopsCurAnim = null;
+			noteLoopsAnimDropDown.setData(FlxUIDropDownMenu.makeStrIdLabelArray([''], true));
 			_refreshNoteLoopsFields();
+			return;
 		}
+
+		var names = [for (a in character.animationsArray) a.anim];
+		noteLoopsAnimDropDown.setData(FlxUIDropDownMenu.makeStrIdLabelArray(names, true));
+		_noteLoopsCurAnim = character.animationsArray[0];
+		_refreshNoteLoopsFields();
 	}
 
 	function _refreshNoteLoopsFields()
 	{
-		if (_noteLoopsCurAnim == null) return;
+		if (noteLoopsHoldTypeDropDown == null || noteLoopsStaticFrameStepper == null || noteLoopsLoopStartStepper == null || noteLoopsLoopEndStepper == null || noteLoopsEndAnimInputText == null) return;
+		if (_noteLoopsCurAnim == null)
+		{
+			noteLoopsHoldTypeDropDown.selectedLabel = "normal";
+			noteLoopsStaticFrameStepper.value = 0;
+			noteLoopsLoopStartStepper.value = 0;
+			noteLoopsLoopEndStepper.value = 1;
+			noteLoopsEndAnimInputText.text = '';
+			_updateNoteLoopsVisibility();
+			return;
+		}
 		var holdType = _noteLoopsCurAnim.hold_type ?? "normal";
 		noteLoopsHoldTypeDropDown.selectedLabel = holdType;
 		noteLoopsStaticFrameStepper.value = _noteLoopsCurAnim.hold_static_frame ?? 0;
@@ -895,11 +949,23 @@ class CharacterEditorState extends MusicBeatState
 
 	function _updateNoteLoopsVisibility()
 	{
+		if (noteLoopsStaticFrameStepper == null || noteLoopsLoopStartStepper == null || noteLoopsLoopEndStepper == null) return;
 		var ht = _noteLoopsCurAnim != null ? (_noteLoopsCurAnim.hold_type ?? "normal") : "normal";
 
 		noteLoopsStaticFrameStepper.visible = noteLoopsStaticFrameStepper.active = (ht == "static");
 		noteLoopsLoopStartStepper.visible   = noteLoopsLoopStartStepper.active   = (ht == "loop2frame");
 		noteLoopsLoopEndStepper.visible     = noteLoopsLoopEndStepper.active     = (ht == "loop2frame");
+	}
+
+	function _applyNoteLoopFields():Void
+	{
+		if (_noteLoopsCurAnim == null || noteLoopsStaticFrameStepper == null) return;
+
+		var ht = _noteLoopsCurAnim.hold_type ?? "normal";
+		_noteLoopsCurAnim.hold_static_frame = ht == "static" ? Std.int(noteLoopsStaticFrameStepper.value) : null;
+		_noteLoopsCurAnim.hold_loop_start = ht == "loop2frame" ? Std.int(noteLoopsLoopStartStepper.value) : null;
+		_noteLoopsCurAnim.hold_loop_end = ht == "loop2frame" ? Std.int(noteLoopsLoopEndStepper.value) : null;
+		_noteLoopsCurAnim.hold_end_anim = noteLoopsEndAnimInputText.text.trim().length > 0 ? noteLoopsEndAnimInputText.text.trim() : null;
 	}
 
 	function reloadCharacterImage()
@@ -974,7 +1040,7 @@ class CharacterEditorState extends MusicBeatState
 	{
 		super.update(elapsed);
 
-		if(animationInputText.hasFocus || animationNameInputText.hasFocus || animationIndicesInputText.hasFocus || imageInputText.hasFocus || healthIconInputText.hasFocus || vocalsInputText.hasFocus)
+		if(animationInputText.hasFocus || animationNameInputText.hasFocus || animationIndicesInputText.hasFocus || imageInputText.hasFocus || healthIconInputText.hasFocus || vocalsInputText.hasFocus || noteLoopsEndAnimInputText.hasFocus)
 		{
 			ClientPrefs.toggleVolumeKeys(false);
 			return;
@@ -1148,6 +1214,7 @@ class CharacterEditorState extends MusicBeatState
 		}
 		if(txt != frameAdvanceText.text) frameAdvanceText.text = txt;
 		frameAdvanceText.color = clr;
+		updateEditorInfo();
 
 		// OTHER CONTROLS
 		if(FlxG.keys.justPressed.F12)
@@ -1338,6 +1405,30 @@ class CharacterEditorState extends MusicBeatState
 					if(!characterList.contains(charToCheck))
 						characterList.push(charToCheck);
 				}
+
+		#if MODS_ALLOWED
+		for (mod in Mods.getModDirectories())
+		{
+			var listText = Paths.getModFileText('data/characterList.txt', mod);
+			if (listText != null)
+				for (charName in CoolUtil.listFromString(listText))
+					if (charName.length > 0 && !characterList.contains(charName))
+						characterList.push(charName);
+
+			if (ZipModManager.hasZip(mod))
+				for (file in ZipModManager.listFiles(mod, 'characters', 'json'))
+				{
+					var slash = file.lastIndexOf('/');
+					var name = slash >= 0 ? file.substr(slash + 1) : file;
+					if (name.toLowerCase().endsWith('.json'))
+					{
+						var charToCheck = name.substr(0, name.length - 5);
+						if(!characterList.contains(charToCheck))
+							characterList.push(charToCheck);
+					}
+				}
+		}
+		#end
 
 		if(characterList.length < 1) characterList.push('');
 		charDropDown.setData(FlxUIDropDownMenu.makeStrIdLabelArray(characterList, true));
