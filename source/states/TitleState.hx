@@ -63,8 +63,12 @@ class TitleState extends MusicBeatState
 	#end
 
 	var mustUpdate:Bool = false;
-
 	var titleJSON:TitleData;
+
+	var _assetsSelectGroup:FlxGroup;
+	var _assetsChoices:Array<String> = [];
+	var _assetsCursor:Int = 0;
+	var _selectingAssets:Bool = false;
 
 	public static var updateVersion:String = '';
 
@@ -162,12 +166,12 @@ class TitleState extends MusicBeatState
 			MusicBeatState.switchState(new FlashingState());
 		} else {
 			if (initialized)
-				startIntro();
+				_checkAssetsZip(startIntro);
 			else
 			{
 				new FlxTimer().start(1, function(tmr:FlxTimer)
 				{
-					startIntro();
+					_checkAssetsZip(startIntro);
 				});
 			}
 		}
@@ -179,6 +183,75 @@ class TitleState extends MusicBeatState
 	var danceLeft:Bool = false;
 	var titleText:FlxSprite;
 	var swagShader:ColorSwap = null;
+
+	function _checkAssetsZip(next:Void->Void):Void
+	{
+		_assetsChoices = backend.ZipModManager.getAvailableAssetsZips();
+		if (_assetsChoices.length <= 1)
+		{
+			if (_assetsChoices.length == 1)
+				backend.ZipModManager.selectAssetsZip(_assetsChoices[0]);
+			next();
+			return;
+		}
+
+		var saved = FlxG.save.data.selectedAssetsZip;
+		if (saved != null && _assetsChoices.contains(saved))
+		{
+			backend.ZipModManager.selectAssetsZip(saved);
+			next();
+			return;
+		}
+
+		_selectingAssets = true;
+		_buildAssetsSelectScreen(next);
+	}
+
+	var _assetsNextCallback:Void->Void;
+
+	function _buildAssetsSelectScreen(next:Void->Void):Void
+	{
+		_assetsNextCallback = next;
+		_assetsSelectGroup = new FlxGroup();
+		add(_assetsSelectGroup);
+
+		var bg = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, 0xFF000000);
+		bg.alpha = 0.85;
+		_assetsSelectGroup.add(bg);
+
+		var title = new FlxText(0, 40, FlxG.width, 'Select Assets Pack', 28);
+		title.alignment = CENTER;
+		title.color = FlxColor.WHITE;
+		_assetsSelectGroup.add(title);
+
+		var hint = new FlxText(0, FlxG.height - 50, FlxG.width, 'UP/DOWN — select    ENTER — confirm    R — reset to default', 14);
+		hint.alignment = CENTER;
+		hint.color = 0xFFAAAAAA;
+		_assetsSelectGroup.add(hint);
+
+		_assetsCursor = 0;
+		_renderAssetsChoices();
+	}
+
+	var _assetsItemTexts:Array<FlxText> = [];
+
+	function _renderAssetsChoices():Void
+	{
+		for (t in _assetsItemTexts) _assetsSelectGroup.remove(t, true);
+		_assetsItemTexts = [];
+
+		for (i in 0..._assetsChoices.length)
+		{
+			var label = _assetsChoices[i];
+			var shortLabel = label.split('/').pop().replace('.zip', '');
+			var t = new FlxText(0, 120 + i * 50, FlxG.width,
+				(i == _assetsCursor ? '> ' : '  ') + shortLabel, 20);
+			t.alignment = CENTER;
+			t.color = i == _assetsCursor ? FlxColor.YELLOW : FlxColor.WHITE;
+			_assetsSelectGroup.add(t);
+			_assetsItemTexts.push(t);
+		}
+	}
 
 	function startIntro()
 	{
@@ -486,6 +559,29 @@ class TitleState extends MusicBeatState
 		}
 
 		super.update(elapsed);
+		if (_selectingAssets)
+		{
+			if (controls.UI_UP_P) { _assetsCursor = (_assetsCursor - 1 + _assetsChoices.length) % _assetsChoices.length; _renderAssetsChoices(); FlxG.sound.play(Paths.sound('scrollMenu')); }
+			if (controls.UI_DOWN_P) { _assetsCursor = (_assetsCursor + 1) % _assetsChoices.length; _renderAssetsChoices(); FlxG.sound.play(Paths.sound('scrollMenu')); }
+			if (controls.ACCEPT)
+			{
+				var chosen = _assetsChoices[_assetsCursor];
+				backend.ZipModManager.selectAssetsZip(chosen);
+				FlxG.save.data.selectedAssetsZip = chosen;
+				FlxG.save.flush();
+				_selectingAssets = false;
+				remove(_assetsSelectGroup);
+				FlxG.sound.play(Paths.sound('confirmMenu'));
+				_assetsNextCallback();
+			}
+			if (FlxG.keys.justPressed.R)
+			{
+				FlxG.save.data.selectedAssetsZip = null;
+				FlxG.save.flush();
+				FlxG.sound.play(Paths.sound('cancelMenu'));
+			}
+			return;
+		}
 	}
 
 	function createCoolText(textArray:Array<String>, ?offset:Float = 0)

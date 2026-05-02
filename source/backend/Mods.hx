@@ -96,7 +96,22 @@ class Mods
 
 		for (file in paths)
 		{
-			var list:Array<String> = CoolUtil.coolTextFile(file);
+			var list:Array<String>;
+			if (file.startsWith('zip:'))
+			{
+				var inner = file.substr(4);
+				var slash = inner.indexOf('/');
+				if (slash > 0)
+				{
+					var modName = inner.substr(0, slash);
+					var innerPath = inner.substr(slash + 1);
+					var txt = backend.ZipModManager.getText(modName, innerPath);
+					list = txt != null ? CoolUtil.listFromString(txt) : [];
+				} else list = [];
+			}
+			else
+				list = CoolUtil.coolTextFile(file);
+
 			for (value in list)
 				if((allowDuplicates || !mergedList.contains(value)) && value.length > 0)
 					mergedList.push(value);
@@ -115,22 +130,26 @@ class Mods
 		#if MODS_ALLOWED
 		if(mods)
 		{
-			// Global mods first
 			for(mod in Mods.getGlobalMods())
 			{
 				var folder:String = Paths.mods(mod + '/' + fileToFind);
 				if(FileSystem.exists(folder) && !foldersToCheck.contains(folder)) foldersToCheck.push(folder);
 			}
 
-			// Then "PsychEngine/mods/" main folder
 			var folder:String = Paths.mods(fileToFind);
 			if(FileSystem.exists(folder) && !foldersToCheck.contains(folder)) foldersToCheck.push(Paths.mods(fileToFind));
 
-			// And lastly, the loaded mod's folder
 			if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
 			{
 				var folder:String = Paths.mods(Mods.currentModDirectory + '/' + fileToFind);
 				if(FileSystem.exists(folder) && !foldersToCheck.contains(folder)) foldersToCheck.push(folder);
+			}
+
+			for (zipMod in backend.ZipModManager.getModNames())
+			{
+				var zipKey = 'zip:$zipMod/$fileToFind';
+				if (backend.ZipModManager.exists(zipMod, fileToFind) && !foldersToCheck.contains(zipKey))
+					foldersToCheck.push(zipKey);
 			}
 		}
 		#end

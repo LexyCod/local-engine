@@ -282,6 +282,16 @@ class Paths
 				bitmap = OpenFlAssets.getBitmapData(file);
 		}
 
+		if (bitmap == null)
+		{
+			var assetsBytes = ZipModManager.getAssetsBytes('images/$key.png');
+			if (assetsBytes != null)
+			{
+				bitmap = bitmapFromBytes(assetsBytes);
+				file = 'assets_zip:images/$key.png';
+			}
+		}
+
 		if (bitmap != null)
 		{
 			var retVal = cacheBitmap(file, bitmap, allowGPU);
@@ -363,6 +373,9 @@ class Paths
 			return File.getContent(modFolders(key));
 		#end
 
+		var assetsZipText = ZipModManager.getAssetsText(key);
+		if (assetsZipText != null) return assetsZipText;
+
 		if (FileSystem.exists(getSharedPath(key)))
 			return File.getContent(getSharedPath(key));
 
@@ -425,6 +438,9 @@ class Paths
 		#if MODS_ALLOWED
 		var modText = getModFileText(relativePath);
 		if (modText != null) return modText;
+
+		var assetsZipText = ZipModManager.getAssetsText(relativePath);
+		if (assetsZipText != null) return assetsZipText;
 		#end
 
 		#if sys

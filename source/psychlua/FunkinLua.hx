@@ -1510,24 +1510,34 @@ class FunkinLua {
 		ShaderFunctions.implement(this);
 		DeprecatedFunctions.implement(this);
 
-		try{
+		try {
+			var bytes:haxe.io.Bytes = null;
 			var isString:Bool = !FileSystem.exists(scriptName);
-			var result:Dynamic = null;
-			if(!isString)
-				result = LuaL.dofile(lua, scriptName);
-			else
-				result = LuaL.dostring(lua, scriptName);
+			
+			if(!isString) {
+				bytes = FileSystem.getBytes(scriptName);
+			} else {
+				bytes = haxe.io.Bytes.ofString(scriptName);
+			}
 
-			var resultStr:String = Lua.tostring(lua, result);
-			if(resultStr != null && result != 0) {
-				trace(resultStr);
-				#if windows
-				lime.app.Application.current.window.alert(resultStr, 'Error on lua script!');
-				#else
-				luaTrace('$scriptName\n$resultStr', true, false, FlxColor.RED);
-				#end
-				lua = null;
-				return;
+			var status:Int = LuaL.loadbuffer(lua, bytes.toString(), bytes.length, "=" + scriptName);
+			
+			if (status == 0) {
+				status = Lua.pcall(lua, 0, Lua.MULTRET, 0);
+			}
+
+			if(status != 0) {
+				var resultStr:String = Lua.tostring(lua, -1);
+				if(resultStr != null) {
+					trace(resultStr);
+					#if windows
+					lime.app.Application.current.window.alert(resultStr, 'Error on lua script!');
+					#else
+					luaTrace('$scriptName\n$resultStr', true, false, FlxColor.RED);
+					#end
+					lua = null;
+					return;
+				}
 			}
 			if(isString) scriptName = 'unknown';
 		} catch(e:Dynamic) {

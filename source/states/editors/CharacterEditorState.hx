@@ -367,7 +367,7 @@ class CharacterEditorState extends MusicBeatState
 			}
 		};
 
-		var ghostAlphaSlider:FlxUISlider = new FlxUISlider(this, 'ghostAlpha', 10, makeGhostButton.y + 25, 0, 1, 210, null, 5, FlxColor.WHITE, FlxColor.BLACK);
+		var ghostAlphaSlider:FlxUISlider = new FlxUISlider(this, 'ghostAlpha', 10, makeGhostButton.y + 25, 0, 1, 210, 0, 5, FlxColor.WHITE, FlxColor.BLACK);
 		ghostAlphaSlider.nameLabel.text = 'Opacity:';
 		ghostAlphaSlider.decimals = 2;
 		ghostAlphaSlider.callback = function(relativePos:Float) {
@@ -1198,28 +1198,17 @@ class CharacterEditorState extends MusicBeatState
 	var characterList:Array<String> = [];
 	function reloadCharacterDropDown() {
 		characterList = Mods.mergeAllTextsNamed('data/characterList.txt', Paths.getSharedPath());
-
 		var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getSharedPath(), 'characters/');
 		for (folder in foldersToCheck)
-			if (sys.FileSystem.exists(folder))
-				for (file in sys.FileSystem.readDirectory(folder))
-					if(file.toLowerCase().endsWith('.json'))
-					{
-						var charToCheck = file.substr(0, file.length - 5);
-						if (!characterList.contains(charToCheck))
-							characterList.push(charToCheck);
-					}
-
-		for (modName in backend.ZipModManager.getModNames())
-			for (file in backend.ZipModManager.listFiles(modName, 'characters', 'json'))
-			{
-				var base = haxe.io.Path.withoutExtension(haxe.io.Path.withoutDirectory(file));
-				if (!characterList.contains(base))
-					characterList.push(base);
-			}
+			for (file in FileSystem.readDirectory(folder))
+				if(file.toLowerCase().endsWith('.json'))
+				{
+					var charToCheck:String = file.substr(0, file.length - 5);
+					if(!characterList.contains(charToCheck))
+						characterList.push(charToCheck);
+				}
 
 		if(characterList.length < 1) characterList.push('');
-		characterList.sort(Reflect.compare);
 		charDropDown.setData(FlxUIDropDownMenu.makeStrIdLabelArray(characterList, true));
 		charDropDown.selectedLabel = _char;
 	}
