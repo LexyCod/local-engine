@@ -4,14 +4,20 @@ import flixel.FlxG;
 import openfl.text.TextField;
 import openfl.text.TextFormat;
 import openfl.system.System;
+import openfl.display.Sprite;
+import openfl.display.Shape;
 import backend.LocalEngineVersion;
 import backend.AsyncSongLoader;
 import states.PlayState;
 
-class FPSCounter extends TextField
+class FPSCounter extends Sprite
 {
+	public var textField:TextField;
+	public var bg:Shape;
+
 	public var currentFPS(default, null):Int;
 	public var memoryMegas(get, never):Float;
+	public var highestMem:Float = 0;
 	
 	@:noCompletion private var times:Array<Float>;
 
@@ -19,34 +25,32 @@ class FPSCounter extends TextField
 	static var _commitPanel:String = null;
 
 	var _showCommitPanel:Bool = false;
-
 	var deltaTimeout:Float = 0.0;
 
-	public function new(x:Float = 10, y:Float = 10, color:Int = 0x000000)
+	public function new(x:Float = 10, y:Float = 10, color:Int = 0xFFFFFF)
 	{
 		super();
 
 		this.x = x;
 		this.y = y;
 
-		currentFPS = 0;
-		selectable    = false;
-		mouseEnabled  = false;
-		defaultTextFormat = new TextFormat("_sans", 14, color);
-		autoSize  = LEFT;
-		multiline = true;
-		text      = "FPS: ";
+		bg = new Shape();
+		addChild(bg);
 
+		textField = new TextField();
+		textField.selectable = false;
+		textField.mouseEnabled = false;
+		textField.defaultTextFormat = new TextFormat(Paths.font("vcr.ttf"), 14, color);
+		textField.autoSize = LEFT;
+		textField.multiline = true;
+		addChild(textField);
+
+		currentFPS = 0;
 		times = [];
 	}
 
 	private override function __enterFrame(deltaTime:Float):Void
 	{
-		if (deltaTimeout > 1000) {
-			deltaTimeout = 0.0;
-			return;
-		}
-
 		final now:Float = haxe.Timer.stamp() * 1000;
 		times.push(now);
 		while (times[0] < now - 1000) times.shift();
@@ -59,7 +63,15 @@ class FPSCounter extends TextField
 		#end
 
 		updateText();
-		deltaTimeout += deltaTime;
+		updateBackground();
+	}
+
+	public function updateBackground():Void
+	{
+		bg.graphics.clear();
+		bg.graphics.beginFill(0x000000, 0.5);
+		bg.graphics.drawRect(-5, -2, textField.width + 10, textField.height + 4);
+		bg.graphics.endFill();
 	}
 
 	public dynamic function updateText():Void
@@ -68,12 +80,16 @@ class FPSCounter extends TextField
 			_shortInfo = LocalEngineVersion.SHORT_STRING;
 
 		var memBytes:Float = memoryMegas;
-		var memStr:String  = flixel.util.FlxStringUtil.formatBytes(memBytes);
-		var memMB:Float    = memBytes / 1024 / 1024;
+		var memMB:Float = Math.round(memBytes / 1024 / 1024);
+		
+		if (memMB > highestMem)
+			highestMem = memMB;
 
 		var out:String = 'FPS: $currentFPS'
-			+ '\nMemory: $memStr'
-			+ '\n$_shortInfo';
+			+ '\nMemory: ${memMB} MB'
+			+ '\nMem Peak: ${highestMem} MB'
+			+ '\n$_shortInfo'
+			+ '\nTAB (commit changes)';
 
 		if (PlayState.instance != null && PlayState.isStoryMode)
 		{
@@ -81,7 +97,7 @@ class FPSCounter extends TextField
 			if (playlist != null && playlist.length > 1)
 			{
 				var nextSong = playlist[1];
-				var status   = AsyncSongLoader.getStatus(nextSong, Difficulty.getFilePath());
+				var status = AsyncSongLoader.getStatus(nextSong, Difficulty.getFilePath());
 				out += '\nNext: $nextSong [$status]';
 			}
 		}
@@ -94,14 +110,10 @@ class FPSCounter extends TextField
 			if (_commitPanel == null) _buildCommitPanel();
 			out += '\n' + _commitPanel;
 		}
-		else
-		{
-			out += '\n[Tab] commit info';
-		}
 		#end
 
-		text      = out;
-		textColor = (currentFPS < FlxG.drawFramerate * 0.5) ? 0xFFFF0000 : (memMB > 900 ? 0xFFFF8800 : 0xFFFFFFFF);
+		textField.text = out;
+		textField.textColor = (currentFPS < FlxG.drawFramerate * 0.5) ? 0xFFFF0000 : (memMB > 900 ? 0xFFFF8800 : 0xFFFFFFFF);
 	}
 
 	#if (debug || dev)
@@ -114,17 +126,7 @@ class FPSCounter extends TextField
 			return '  • ' + parts[parts.length - 1];
 		}).join('\n');
 
-		_commitPanel =
-			  '──── Last Commit ────────────────'
-			+ '\nCommit(full): ' + LocalEngineVersion.GIT_HASH_FULL
-			+ '\nBranch: ' + LocalEngineVersion.GIT_BRANCH
-			+ '\nAuthor: ' + LocalEngineVersion.GIT_AUTHOR
-			+ '\nDate: ' + LocalEngineVersion.GIT_DATE
-			+ '\nDescription: ' + LocalEngineVersion.GIT_MESSAGE
-			+ '\nStats: dc' + LocalEngineVersion.GIT_STATS
-			+ '\nChanged files:'
-			+ '\n' + fileList
-			+ '\n─────────────────────────────────';
+		_commitPanel = '──── Last Commit ────\n' + LocalEngineVersion.GIT_HASH_FULL + '\n' + fileList;
 	}
 	#end
 
@@ -138,21 +140,9 @@ class FPSCounter extends TextField
 	}
 
 	#if cpp
-	@:noCompletion
-	static function _getNativeMemory():Float
-	{
-		#if !windows
-		try {
-			var status = sys.io.File.getContent('/proc/self/status');
-			var reg = new EReg('VmRSS:\\s*(\\d+)\\s*kB', '');
-			if (reg.match(status))
-				return Std.parseFloat(reg.matched(1)) * 1024;
-		} catch(e:Dynamic) {}
-		#end
-
-		var gcMem:Float  = cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_USAGE);
-		var sysMem:Float = cast(System.totalMemory, UInt);
-		return gcMem; // + sysMem варивант странно этот работает порчемуто
+	static function _getNativeMemory():Float {
+		var gcMem:Float = cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_USAGE);
+		return gcMem;
 	}
 	#end
 }
