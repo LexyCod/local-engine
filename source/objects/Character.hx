@@ -39,12 +39,16 @@ typedef AnimArray = {
 	var indices:Array<Int>;
 	var offsets:Array<Int>;
 
+	// LOCAL ENGINE: настройки цикличных нот при зажатии
 	@:optional var hold_type:Null<String>;   // null/"normal" | "static" | "loop2frame"
-
-	@:optional var hold_static_frame:Null<Int>;
-	@:optional var hold_loop_start:Null<Int>;
-	@:optional var hold_loop_end:Null<Int>;
-	@:optional var hold_end_anim:Null<String>;
+	// hold_type:
+	//   null / "normal"   — стандарт Psych, анимация играет как обычно
+	//   "static"          — на кадре hold_static_frame зависает пока нота зажата
+	//   "loop2frame"      — циклит между hold_loop_start и hold_loop_end кадрами
+	@:optional var hold_static_frame:Null<Int>;  // кадр для "static" (дефолт: последний кадр)
+	@:optional var hold_loop_start:Null<Int>;    // начало цикла для "loop2frame"
+	@:optional var hold_loop_end:Null<Int>;      // конец цикла для "loop2frame"
+	@:optional var hold_end_anim:Null<String>;   // анимация которая играет в конце ноты (опционально)
 }
 
 class Character extends FlxSprite
@@ -65,9 +69,10 @@ class Character extends FlxSprite
 	public var heyTimer:Float = 0;
 	public var specialAnim:Bool = false;
 
-	var _holdLoopTimer:Float = 0;
-	var _holdActive:Bool = false;
-	var _holdAnimName:String = '';
+	// LOCAL ENGINE: состояние hold_type логики
+	var _holdLoopTimer:Float  = 0;   // таймер для loop2frame
+	var _holdActive:Bool      = false; // персонаж сейчас держит ноту
+	var _holdAnimName:String  = '';    // имя sing анимации которая сейчас держится
 	public var animationNotes:Array<Dynamic> = [];
 	public var stunned:Bool = false;
 	public var singDuration:Float = 4; //Multiplier of how long a character holds the sing pose
@@ -107,18 +112,27 @@ class Character extends FlxSprite
 
 			default:
 				var characterPath:String = 'characters/$curCharacter.json';
-				var rawJson:String = Paths.getTextFromFile(characterPath);
-
-				if (rawJson == null)
-				{
-					rawJson = Paths.getTextFromFile('characters/' + DEFAULT_CHARACTER + '.json', true); //If a character couldn't be found, change him to BF just to prevent a crash
-					color = FlxColor.BLACK;
-					alpha = 0.6;
-				}
 
 				try
 				{
-					loadCharacterFile(Json.parse(rawJson));
+					#if MODS_ALLOWED
+					var rawJson:String = Paths.getTextFromFile(characterPath);
+					if (rawJson == null)
+					{
+						rawJson = sys.io.File.getContent(Paths.getSharedPath('characters/' + DEFAULT_CHARACTER + '.json'));
+						color = FlxColor.BLACK;
+						alpha = 0.6;
+					}
+					loadCharacterFile(haxe.Json.parse(rawJson));
+					#else
+					var path = Paths.getSharedPath(characterPath);
+					if (!openfl.utils.Assets.exists(path)) {
+						path = Paths.getSharedPath('characters/' + DEFAULT_CHARACTER + '.json');
+						color = FlxColor.BLACK;
+						alpha = 0.6;
+					}
+					loadCharacterFile(haxe.Json.parse(openfl.utils.Assets.getText(path)));
+					#end
 				}
 				catch(e:Dynamic)
 				{
@@ -142,11 +156,10 @@ class Character extends FlxSprite
 	public function loadCharacterFile(json:Dynamic)
 	{
 		isAnimateAtlas = false;
-		if (json == null) return;
-		if (json.image == null || ('' + json.image).length < 1) json.image = 'characters/BOYFRIEND';
 
 		#if flxanimate
-		if (Paths.fileExists('images/' + json.image + '/Animation.json', TEXT))
+		var animToFind:String = Paths.getPath('images/' + json.image + '/Animation.json', TEXT, null, true);
+		if (#if MODS_ALLOWED FileSystem.exists(animToFind) || #end Assets.exists(animToFind))
 			isAnimateAtlas = true;
 		#end
 
@@ -155,8 +168,7 @@ class Character extends FlxSprite
 
 		if(!isAnimateAtlas)
 		{
-			var cachedFrames = LocalAtlasTextures.getAuto(json.image, 'characters');
-			frames = cachedFrames != null ? cachedFrames : Paths.getAtlas(json.image);
+			frames = Paths.getAtlas(json.image);
 		}
 		#if flxanimate
 		else
@@ -175,19 +187,19 @@ class Character extends FlxSprite
 		#end
 
 		imageFile = json.image;
-		jsonScale = json.scale != null ? json.scale : 1;
-		if(jsonScale != 1) {
+		jsonScale = json.scale;
+		if(json.scale != 1) {
 			scale.set(jsonScale, jsonScale);
 			updateHitbox();
 		}
 
 		// positioning
-		positionArray = json.position != null ? json.position : [0, 0];
-		cameraPosition = json.camera_position != null ? json.camera_position : [0, 0];
+		positionArray = json.position;
+		cameraPosition = json.camera_position;
 
 		// data
-		healthIcon = json.healthicon != null ? json.healthicon : 'face';
-		singDuration = json.sing_duration != null ? json.sing_duration : 4;
+		healthIcon = json.healthicon;
+		singDuration = json.sing_duration;
 		flipX = (json.flip_x != isPlayer);
 		healthColorArray = (json.healthbar_colors != null && json.healthbar_colors.length > 2) ? json.healthbar_colors : [161, 161, 161];
 		vocalsFile = json.vocals_file != null ? json.vocals_file : '';
@@ -199,7 +211,7 @@ class Character extends FlxSprite
 		antialiasing = ClientPrefs.data.antialiasing ? !noAntialiasing : false;
 
 		// animations
-		animationsArray = json.animations != null ? json.animations : [];
+		animationsArray = json.animations;
 		if(animationsArray != null && animationsArray.length > 0) {
 			for (anim in animationsArray) {
 				var animAnim:String = '' + anim.anim;
@@ -241,7 +253,6 @@ class Character extends FlxSprite
 
 		if(debugMode || (!isAnimateAtlas && animation.curAnim == null) || (isAnimateAtlas && atlas.anim.curSymbol == null))
 		{
-			if(debugMode) updateHoldLoopState();
 			super.update(elapsed);
 			return;
 		}
@@ -298,13 +309,50 @@ class Character extends FlxSprite
 			holdTimer = 0;
 		}
 
-		updateHoldLoopState();
+		// LOCAL ENGINE: hold_type логика
+		if (curAnimName.startsWith('sing') && !curAnimName.endsWith('miss'))
+		{
+			var animData = getAnimData(curAnimName);
+			if (animData != null)
+			{
+				var ht = animData.hold_type;
+				if (ht == 'static')
+				{
+					// LOCAL ENGINE: зависаем на hold_static_frame пока нота зажата
+					if (!isAnimateAtlas && animation.curAnim != null)
+					{
+						var targetFrame:Int = animData.hold_static_frame ?? (animation.curAnim.frames.length - 1);
+						// Когда дошли до нужного кадра — фиксируем через finished
+						if (animation.curAnim.curFrame >= targetFrame || animation.curAnim.finished)
+						{
+							animation.curAnim.curFrame = targetFrame;
+						}
+					}
+				}
+				else if (ht == 'loop2frame')
+				{
+					// LOCAL ENGINE: циклим между двумя кадрами пока нота зажата
+					if (!isAnimateAtlas && animation.curAnim != null)
+					{
+						var loopStart:Int = animData.hold_loop_start ?? 0;
+						var loopEnd:Int   = animData.hold_loop_end   ?? 1;
+						if (loopEnd >= animation.curAnim.frames.length)
+							loopEnd = animation.curAnim.frames.length - 1;
+						if (animation.curAnim.curFrame >= loopEnd || animation.curAnim.finished)
+						{
+							animation.curAnim.curFrame = loopStart;
+						}
+					}
+				}
+			}
+		}
+		// Когда нота отпустилась — воспроизводим hold_end_anim если задана
 		var wasHolding = _holdActive;
 		_holdActive = curAnimName.startsWith('sing') && !curAnimName.endsWith('miss');
 		if (wasHolding && !_holdActive && _holdAnimName.length > 0)
 		{
 			var prevData = getAnimData(_holdAnimName);
-			if (prevData != null && prevData.hold_end_anim != null && hasAnimation(prevData.hold_end_anim))
+			if (prevData != null && prevData.hold_end_anim != null && animOffsets.exists(prevData.hold_end_anim))
 			{
 				playAnim(prevData.hold_end_anim, true);
 				specialAnim = true;
@@ -312,92 +360,27 @@ class Character extends FlxSprite
 		}
 		_holdAnimName = _holdActive ? curAnimName : '';
 
-		if(isAnimationFinished() && hasAnimation('$curAnimName-loop'))
+		// стандартный -loop суффикс (оригинальный Psych)
+		if(isAnimationFinished() && animOffsets.exists('$curAnimName-loop'))
 			playAnim('$curAnimName-loop');
 
 		super.update(elapsed);
 	}
 
+	/**
+	 * LOCAL ENGINE: получить AnimArray данные текущей анимации.
+	 * Используется для hold_type логики.
+	 */
 	public function getAnimData(?animName:String):Null<AnimArray>
 	{
 		var name = animName != null ? animName : getAnimationName();
-		if (animationsArray == null) return null;
 		for (a in animationsArray)
 			if (a.anim == name) return a;
 		return null;
 	}
 
-	function updateHoldLoopState():Void
-	{
-		var curAnimName:String = getAnimationName();
-		if (!curAnimName.startsWith('sing') || curAnimName.endsWith('miss')) return;
-
-		var animData = getAnimData(curAnimName);
-		if (animData == null) return;
-
-		var frameCount = getCurrentFrameCount();
-		if (frameCount < 1) return;
-
-		switch(animData.hold_type)
-		{
-			case 'static':
-				var targetFrame:Int = clampAnimFrame(animData.hold_static_frame ?? (frameCount - 1), frameCount);
-				if (getCurrentFrame() >= targetFrame || isAnimationFinished())
-				{
-					setCurrentFrame(targetFrame);
-					animPaused = true;
-				}
-			case 'loop2frame':
-				var loopStart:Int = clampAnimFrame(animData.hold_loop_start ?? 0, frameCount);
-				var loopEnd:Int = clampAnimFrame(animData.hold_loop_end ?? (frameCount - 1), frameCount);
-				if (loopEnd < loopStart) loopEnd = loopStart;
-				if (getCurrentFrame() >= loopEnd || isAnimationFinished())
-				{
-					setCurrentFrame(loopStart);
-					animPaused = false;
-				}
-			default:
-		}
-	}
-
-	public function hasAnimation(name:String):Bool
-	{
-		if (name == null || name.length < 1) return false;
-		if (!isAnimateAtlas) return animation.exists(name);
-		#if flxanimate
-		return atlas != null && atlas.anim != null && @:privateAccess atlas.anim.animsMap.exists(name);
-		#else
-		return false;
-		#end
-	}
-
-	function getCurrentFrameCount():Int
-	{
-		if (isAnimationNull()) return 0;
-		return !isAnimateAtlas ? animation.curAnim.numFrames : atlas.anim.length;
-	}
-
-	function getCurrentFrame():Int
-	{
-		if (isAnimationNull()) return 0;
-		return !isAnimateAtlas ? animation.curAnim.curFrame : atlas.anim.curFrame;
-	}
-
-	function setCurrentFrame(frame:Int):Void
-	{
-		if (isAnimationNull()) return;
-		if (!isAnimateAtlas) animation.curAnim.curFrame = frame;
-		else atlas.anim.curFrame = frame;
-	}
-
-	inline function clampAnimFrame(frame:Int, frameCount:Int):Int
-	{
-		if (frameCount < 1) return 0;
-		return Std.int(Math.max(0, Math.min(frame, frameCount - 1)));
-	}
-
 	inline public function isAnimationNull():Bool
-		return !isAnimateAtlas ? (animation.curAnim == null) : (atlas == null || atlas.anim == null || atlas.anim.curSymbol == null);
+		return !isAnimateAtlas ? (animation.curAnim == null) : (atlas.anim.curSymbol == null);
 
 	inline public function getAnimationName():String
 	{
@@ -425,7 +408,7 @@ class Character extends FlxSprite
 	private function get_animPaused():Bool
 	{
 		if(isAnimationNull()) return false;
-		return !isAnimateAtlas ? animation.curAnim.paused : !atlas.anim.isPlaying;
+		return !isAnimateAtlas ? animation.curAnim.paused : atlas.anim.isPlaying;
 	}
 	private function set_animPaused(value:Bool):Bool
 	{
@@ -466,7 +449,6 @@ class Character extends FlxSprite
 
 	public function playAnim(AnimName:String, Force:Bool = false, Reversed:Bool = false, Frame:Int = 0):Void
 	{
-		if (!hasAnimation(AnimName)) return;
 		specialAnim = false;
 		if(!isAnimateAtlas) animation.play(AnimName, Force, Reversed, Frame);
 		else atlas.anim.play(AnimName, Force, Reversed, Frame);

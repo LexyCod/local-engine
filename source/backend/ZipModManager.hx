@@ -100,6 +100,24 @@ class ZipModManager
 		caches.clear();
 	}
 
+	public static function diagnose(modName:String):Void
+	{
+		var cache = getCache(modName);
+		if (cache == null) { trace('[ZipModManager] No cache for: $modName'); return; }
+		var _ec = 0; for (_ in cache.entries) _ec++;
+		trace('[ZipModManager] $modName — $_ec entries, root="${cache.rootPrefix}"');
+		var shown = 0;
+		for (k in cache.entries.keys()) {
+			trace('  $k');
+			if (++shown >= 30) { trace('  ...and more'); break; }
+		}
+	}
+
+	public static function listAllFiles(modName:String):Array<String>
+	{
+		return listFiles(modName, '', null);
+	}
+
 	static function getEntry(modName:String, path:String):Entry
 	{
 		var cache = getCache(modName);
@@ -191,7 +209,8 @@ class ZipModManager
 	static function normalizePath(path:String):String
 	{
 		if (path == null) return "";
-		path = path.replace("\\", "/");
+
+		path = path.replace("\\", "/").toLowerCase(); 
 		while (path.startsWith("/")) path = path.substr(1);
 		while (path.startsWith("./")) path = path.substr(2);
 		return path;

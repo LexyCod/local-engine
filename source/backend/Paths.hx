@@ -573,25 +573,27 @@ class Paths
 	{
 		key = normalizePath(key);
 
+		var strippedKey = key;
+		if (key.startsWith("assets/")) strippedKey = key.substr(7);
+
 		if (folder != null && folder.length > 0)
-			return findAssetInMod(folder, key);
+			return findAssetInMod(folder, strippedKey);
 
 		if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
 		{
-			var current = findAssetInMod(Mods.currentModDirectory, key);
+			var current = findAssetInMod(Mods.currentModDirectory, strippedKey);
 			if (current != null) return current;
 		}
 
 		for(mod in Mods.getGlobalMods())
 		{
-			var global = findAssetInMod(mod, key);
+			var global = findAssetInMod(mod, strippedKey);
 			if (global != null) return global;
 		}
 
-		for(mod in Mods.getModDirectories())
+		for(mod in ZipModManager.getModNames())
 		{
-			if (mod == Mods.currentModDirectory || Mods.getGlobalMods().contains(mod)) continue;
-			var discovered = findAssetInMod(mod, key);
+			var discovered = findAssetInMod(mod, strippedKey);
 			if (discovered != null) return discovered;
 		}
 
