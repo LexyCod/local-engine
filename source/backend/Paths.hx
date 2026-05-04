@@ -26,7 +26,6 @@ import backend.Mods;
 import backend.CacheManager;
 import backend.AudioBackend;
 #if MODS_ALLOWED
-import backend.ZipModManager;
 #end
 
 class Paths
@@ -38,23 +37,6 @@ class Paths
 		if (!dumpExclusions.contains(key))
 			dumpExclusions.push(key);
 	}
-
-	#if MODS_ALLOWED
-	static function extractZipModPath(key:String):Dynamic {
-		key = normalizePath(key);
-		if (key.indexOf('mods/') == 0) {
-			var modPath = key.substr(5);
-			var parts = modPath.split('/');
-			var modName = parts[0];
-
-			if (modName != '' && parts.length > 1 && ZipModManager.hasZip(modName)) {
-				var inner = modPath.substr(modName.length + 1);
-				return {modName: modName, innerPath: inner};
-			}
-		}
-		return null;
-	}
-	#end
 
 	static function normalizePath(key:String):String
 	{
@@ -282,16 +264,6 @@ class Paths
 				bitmap = OpenFlAssets.getBitmapData(file);
 		}
 
-		if (bitmap == null)
-		{
-			var assetsBytes = ZipModManager.getAssetsBytes('images/$key.png');
-			if (assetsBytes != null)
-			{
-				bitmap = bitmapFromBytes(assetsBytes);
-				file = 'assets_zip:images/$key.png';
-			}
-		}
-
 		if (bitmap != null)
 		{
 			var retVal = cacheBitmap(file, bitmap, allowGPU);
@@ -309,12 +281,6 @@ class Paths
 			#if MODS_ALLOWED
 			if (FileSystem.exists(file))
 				bitmap = BitmapData.fromFile(file);
-			else
-			{
-				var zipInfo = extractZipModPath(file);
-				if (zipInfo != null)
-					bitmap = bitmapFromBytes(ZipModManager.getBytes(zipInfo.modName, zipInfo.innerPath));
-			}
 			#end
 
 			if (bitmap == null)
@@ -355,10 +321,6 @@ class Paths
 		#if sys
 		#if MODS_ALLOWED
 		if (!ignoreMods) {
-			var zipInfo = extractZipModPath(key);
-			if (zipInfo != null && ZipModManager.exists(zipInfo.modName, zipInfo.innerPath)) {
-				return ZipModManager.getText(zipInfo.modName, zipInfo.innerPath);
-			}
 		}
 
 		if (!ignoreMods) {
@@ -373,8 +335,6 @@ class Paths
 			return File.getContent(modFolders(key));
 		#end
 
-		var assetsZipText = ZipModManager.getAssetsText(key);
-		if (assetsZipText != null) return assetsZipText;
 
 		if (FileSystem.exists(getSharedPath(key)))
 			return File.getContent(getSharedPath(key));
@@ -439,8 +399,6 @@ class Paths
 		var modText = getModFileText(relativePath);
 		if (modText != null) return modText;
 
-		var assetsZipText = ZipModManager.getAssetsText(relativePath);
-		if (assetsZipText != null) return assetsZipText;
 		#end
 
 		#if sys
@@ -522,9 +480,7 @@ class Paths
 			var cacheKey:String = asset.id;
 			if(!currentTrackedSounds.exists(cacheKey))
 			{
-				var sound:Sound = asset.isZip
-					? AudioBackend.fromBytes(ZipModManager.getBytes(asset.modName, asset.innerPath), cacheKey)
-					: AudioBackend.fromFile(asset.file);
+				var sound:Sound = AudioBackend.fromFile(asset.file);
 				if (sound != null)
 					currentTrackedSounds.set(cacheKey, sound);
 			}
@@ -607,15 +563,10 @@ class Paths
 			if (global != null) return global;
 		}
 
-		for(mod in ZipModManager.getModNames())
-		{
-			var discovered = findAssetInMod(mod, strippedKey);
-			if (discovered != null) return discovered;
-		}
 
 		var looseFile = mods(key);
 		if (FileSystem.exists(looseFile))
-			return {id: looseFile, file: looseFile, isZip: false};
+			return {id: looseFile, file: looseFile};
 
 		return null;
 	}
@@ -626,10 +577,8 @@ class Paths
 
 		var file = mods(mod + '/' + key);
 		if (FileSystem.exists(file))
-			return {id: file, file: file, isZip: false};
+			return {id: file, file: file};
 
-		if (ZipModManager.exists(mod, key))
-			return {id: 'zip:$mod/$key', modName: mod, innerPath: key, isZip: true};
 
 		return null;
 	}
@@ -643,14 +592,14 @@ class Paths
 	{
 		var asset = findModAsset(key, folder);
 		if (asset == null) return null;
-		return asset.isZip ? ZipModManager.getBytes(asset.modName, asset.innerPath) : File.getBytes(asset.file);
+		return File.getBytes(asset.file);
 	}
 
 	public static function getModFileText(key:String, ?folder:String):String
 	{
 		var asset = findModAsset(key, folder);
 		if (asset == null) return null;
-		return asset.isZip ? ZipModManager.getText(asset.modName, asset.innerPath) : File.getContent(asset.file);
+		return File.getContent(asset.file);
 	}
 
 	static function getModAssetId(key:String, ?folder:String):String
@@ -660,7 +609,7 @@ class Paths
 	}
 
 	inline static public function mods(key:String = '') {
-		return 'mods/' + key;
+		return 'content/' + key;
 	}
 
 	inline static public function modsFont(key:String) {
@@ -722,7 +671,7 @@ class Paths
 			if(FileSystem.exists(fileToCheck))
 				return fileToCheck;
 		}
-		return 'mods/' + key;
+		return 'content/' + key;
 	}
 	#end
 

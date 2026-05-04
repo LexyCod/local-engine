@@ -19,6 +19,7 @@ typedef StageFile = {
 	var camera_opponent:Array<Float>;
 	var camera_girlfriend:Array<Float>;
 	var camera_speed:Null<Float>;
+	@:optional var bg_color:Null<String>;
 }
 
 class StageData {
@@ -34,6 +35,7 @@ class StageData {
 			girlfriend: [400, 130],
 			opponent: [100, 100],
 			hide_girlfriend: false,
+			bg_color: "#000000",
 
 			camera_boyfriend: [0, 0],
 			camera_opponent: [0, 0],

@@ -134,27 +134,7 @@ class WeekData {
 			}
 		}
 
-		for (mod in Mods.parseList().enabled)
-		{
-			if (!ZipModManager.hasZip(mod)) continue;
 
-			var directory:String = Paths.mods(mod + '/');
-			var listOfWeeks:Array<String> = CoolUtil.coolTextFile(directory + 'weeks/weekList.txt');
-			for (daWeek in listOfWeeks)
-			{
-				var path:String = directory + 'weeks/' + daWeek + '.json';
-				if (Paths.getModFileText('weeks/$daWeek.json', mod) != null)
-					addWeek(daWeek, path, directory, originalLength, originalLength);
-			}
-
-			for (file in ZipModManager.listFiles(mod, 'weeks', 'json'))
-			{
-				var slash = file.lastIndexOf('/');
-				var name = slash >= 0 ? file.substr(slash + 1) : file;
-				if (name.endsWith('.json'))
-					addWeek(name.substr(0, name.length - 5), directory + file, directory, originalLength, originalLength);
-			}
-		}
 		#end
 	}
 

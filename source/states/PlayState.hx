@@ -322,6 +322,8 @@ class PlayState extends MusicBeatState
 		camHUD.bgColor.alpha = 0;
 		camOther.bgColor.alpha = 0;
 
+		camGame.bgColor = FlxColor.BLACK;
+
 		FlxG.cameras.add(camHUD, false);
 		FlxG.cameras.add(camOther, false);
 		grpNoteSplashes = new FlxTypedGroup<NoteSplash>();
@@ -362,6 +364,11 @@ class PlayState extends MusicBeatState
 		}
 
 		defaultCamZoom = stageData.defaultZoom;
+		if (stageData.bg_color != null && stageData.bg_color.length > 0)
+		{
+			try { camGame.bgColor = FlxColor.fromString(stageData.bg_color); }
+			catch(_) {}
+		}
 
 		stageUI = "normal";
 		if (stageData.stageUI != null && stageData.stageUI.trim().length > 0)

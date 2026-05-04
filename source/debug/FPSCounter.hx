@@ -87,9 +87,10 @@ class FPSCounter extends Sprite
 
 		var out:String = 'FPS: $currentFPS'
 			+ '\nMemory: ${memMB} MB'
-			+ '\nMem Peak: ${highestMem} MB'
-			+ '\n$_shortInfo'
-			+ '\nTAB (commit changes)';
+			+ '\nMem Peak: ${highestMem} MB';
+
+		#if (debug || dev)
+		out += '\n$_shortInfo';
 
 		if (PlayState.instance != null && PlayState.isStoryMode)
 		{
@@ -101,7 +102,7 @@ class FPSCounter extends Sprite
 				out += '\nNext: $nextSong [$status]';
 			}
 		}
-
+		#end
 		if (memMB > 900) out += '\n\u26A0 HIGH MEMORY';
 
 		#if (debug || dev)

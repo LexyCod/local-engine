@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <project>
-	<!-- _________________________ Application Settings _________________________ -->
-
 	<app 
 		title="Friday Night Funkin': Local Engine" 
 		file="LocalEngine" 
@@ -12,17 +10,14 @@
 		company="LexyCod" 
 	/>
 
-	<!--Switch Export with Unique ApplicationID and Icon-->
 	<set name="APP_ID" value="0x0100f6c013bbc000" />
 
-	<!-- NOTE TO SELF: DISABLE THIS IF ISSUES ARE FOUND -->
-	<haxedef name="LINC_LUA_RELATIVE_DYNAMIC_LIB"/> <!-- stable luas PUT AFTER FIRST LINE WITH APP NAME AND ETC -->
+	<haxedef name="LINC_LUA_RELATIVE_DYNAMIC_LIB"/>
 
 	<app preloader="flixel.system.FlxPreloader" />
 
-	<!--Minimum without FLX_NO_GAMEPAD: 11.8, without FLX_NO_NATIVE_CURSOR: 11.2-->
 	<set name="SWF_VERSION" value="11.8" />
-	
+
 	<!-- ______________________ PSYCH ENGINE CUSTOMIZATION ______________________ -->
 
 	<define name="MODS_ALLOWED" if="desktop cpp" />
@@ -30,7 +25,7 @@
 	<define name="LUA_ALLOWED" if="desktop cpp" />
 	<define name="ACHIEVEMENTS_ALLOWED"/>
 	<define name="DISCORD_ALLOWED" if="cpp" />
-	<define name="PSYCH_WATERMARKS"/> <!-- DELETE THIS TO REMOVE WATERMARKS/DEV NAMES ON TITLE SCREEN -->
+	<define name="PSYCH_WATERMARKS"/>
 
 	<section if="officialBuild">
 		<define name="TITLE_SCREEN_EASTER_EGG"/>
@@ -48,16 +43,9 @@
 		vsync="false" 
 	/>
 
-	<!--HTML5-specific-->
 	<window if="html5" resizable="true" />
-
-	<!--Desktop-specific-->
 	<window if="desktop" orientation="landscape" fullscreen="false" resizable="true" vsync="false"/>
-
-	<!--Mobile-specific-->
 	<window if="mobile" orientation="landscape" fullscreen="true" width="0" height="0" resizable="false"/>
-
-	<!--Switch-specific-->
 	<window if="switch" orientation="landscape" fullscreen="true" width="0" height="0" resizable="true" />
 
 	<!-- ______________________ LOCAL ENGINE CUSTOMIZATION ______________________ -->
@@ -65,24 +53,29 @@
 	<define name="DEV_BUILD" unless="RELEASE_BUILD" />
 	<define name="dev" if="DEV_BUILD" />
 	<undefine name="DEV_BUILD" if="RELEASE_BUILD" />
+	<define name="LOCAL_WATERMARKS"/>
 
 	<haxeflag name="-D" value="final" if="RELEASE_BUILD" />
 
+	<!-- HL target defines -->
+	<define name="MODS_ALLOWED" if="desktop hl" />
+	<define name="HSCRIPT_ALLOWED" if="desktop hl" />
+
 	<!-- _____________________________ Path Settings ____________________________ -->
 
-	<set name="BUILD_DIR" value="export/debug" if="debug" />
-	<set name="BUILD_DIR" value="export/release" unless="debug || DEV_BUILD" />
-	<set name="BUILD_DIR" value="export/dev" if="DEV_BUILD" unless="debug" />
-	<set name="BUILD_DIR" value="export/32bit" if="32bits" />
+	<set name="BUILD_DIR" value="export/debug"   if="debug" />
+	<set name="BUILD_DIR" value="export/release"  unless="debug || DEV_BUILD" />
+	<set name="BUILD_DIR" value="export/dev"      if="DEV_BUILD" unless="debug" />
+	<set name="BUILD_DIR" value="export/32bit"    if="32bits" />
+	<set name="BUILD_DIR" value="export/hl-debug" if="hl debug" />
+	<set name="BUILD_DIR" value="export/hl"       if="hl" unless="debug" />
 
 	<classpath name="source" />
 
 	<!-- __________________________ Game Assets & Etc. __________________________ -->
 	
-	<!-- Turn on Crash Handler -->
 	<define name="CRASH_HANDLER" if="desktop release" />
 
-	<!-- Assets -->
 	<assets path="assets/fonts" />
 	<assets path="assets/shared" exclude="*.ogg" if="web"/>
 	<assets path="assets/shared" exclude="*.mp3" unless="web"/>
@@ -91,11 +84,6 @@
 	<assets path="assets/songs" library="songs" exclude="*.mp3" unless="web"/>
 	<assets path="assets/week_assets" library="week_assets" rename="assets" exclude="*.ogg" if="web"/>
 	<assets path="assets/week_assets" library="week_assets" rename="assets" exclude="*.mp3" unless="web"/>
-	
-	<section if="TITLE_SCREEN_EASTER_EGG">
-		<assets path="assets/secrets" rename="assets/shared" exclude="*.ogg" if="web"/>
-		<assets path="assets/secrets" rename="assets/shared" exclude="*.mp3"  unless="web"/>
-	</section>
 
 	<library name="videos" preload="true" if="VIDEOS_ALLOWED"/>
 	<library name="songs" preload="true" />
@@ -104,7 +92,7 @@
 	<define name="CHECK_FOR_UPDATES" if="desktop officialBuild"/>
 
 	<section if="MODS_ALLOWED">
-		<assets path='example_mods' rename='mods' embed='false'/>
+		<assets path='example_mods' rename='content' embed='false'/>
 	</section>
 
 	<!-- _______________________________ Libraries ______________________________ -->
@@ -115,19 +103,40 @@
 	<haxelib name="tjson" />
 	<haxelib name="hxopus" if="cpp" />
 
-	<!--Psych stuff needed-->
 	<haxelib name="linc_luajit" if="cpp" />
 	<haxelib name="SScript" if="desktop" />
 	<haxelib name="hxCodec" if="cpp" />
 	<haxelib name="hxdiscord_rpc" if="cpp" />
 	<haxelib name="flxanimate"/>
 
-	<!-- Disable Discord IO Thread -->
 	<haxedef name="DISCORD_DISABLE_IO_THREAD" if="hxdiscord_rpc" />
 	<haxedef name="NO_PRECOMPILED_HEADERS" if="linux" />
 
-	<!-- Enables a terminal log prompt on debug builds -->
-	<haxelib name="hxcpp-debug-server" if="debug"/>
+	<haxelib name="hxcpp-debug-server" if="debug cpp"/>
+
+	<!-- HL / HashLink target -->
+	<section if="hl">
+		<haxedef name="HL_BUILD" />
+		<haxedef name="FLX_NO_DEBUG" unless="debug" />
+		<haxedef name="MODS_ALLOWED" />
+		<haxedef name="HSCRIPT_ALLOWED" />
+		<haxedef name="ACHIEVEMENTS_ALLOWED" />
+	</section>
+
+	<!-- _________________________ cpp optimizations ____________________________ -->
+
+	<section if="cpp" unless="debug">
+		<haxedef name="HXCPP_OPTIMIZE_FOR_SIZE" unless="RELEASE_BUILD" />
+		<haxedef name="HXCPP_GC_GENERATIONAL" />
+		<haxeflag name="--no-traces" unless="DEV_BUILD" />
+	</section>
+
+	<section if="RELEASE_BUILD cpp">
+		<haxedef name="HXCPP_STRICT_CASTS" />
+		<haxeflag name="-dce" value="full" />
+		<haxeflag name="--no-traces" />
+	</section>
+
 	<haxedef name="HXC_LIBVLC_LOGGING" if="VIDEOS_ALLOWED debug" />
 	
 	<!-- ______________________________ Haxedefines _____________________________ -->
@@ -147,9 +156,9 @@
 
 	<!-- _________________________________ Custom _______________________________ -->
 
-	<assets path='art/iconOG.png' rename='icon.png' if="linux" />
-	<icon path="art/icon16.png" size='16'/>
-	<icon path="art/icon32.png" size='32'/>
-	<icon path="art/icon64.png" size='64'/>
-	<icon path="art/iconOG.png" />
+	<assets path='artStuff/iconOG.png' rename='icon.png' if="linux" />
+	<icon path="artStuff/icon16.png" size='16'/>
+	<icon path="artStuff/icon32.png" size='32'/>
+	<icon path="artStuff/icon64.png" size='64'/>
+	<icon path="artStuff/iconOG.png" />
 </project>

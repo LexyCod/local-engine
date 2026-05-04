@@ -58,9 +58,6 @@ class Mods
 					list.push(folder);
 			}
 
-			for (folder in ZipModManager.getModNames())
-				if (!ignoreModFolders.contains(folder.toLowerCase()) && !list.contains(folder))
-					list.push(folder);
 		}
 		#end
 		return list;
@@ -71,7 +68,7 @@ class Mods
 		#if MODS_ALLOWED
 		if (folder == null || folder.trim().length < 1) return false;
 		var path = Paths.mods(folder);
-		return (FileSystem.exists(path) && FileSystem.isDirectory(path)) || ZipModManager.hasZip(folder);
+		return (FileSystem.exists(path) && FileSystem.isDirectory(path));
 		#else
 		return false;
 		#end
@@ -96,26 +93,12 @@ class Mods
 
 		for (file in paths)
 		{
-			var list:Array<String>;
-			if (file.startsWith('zip:'))
-			{
-				var inner = file.substr(4);
-				var slash = inner.indexOf('/');
-				if (slash > 0)
-				{
-					var modName = inner.substr(0, slash);
-					var innerPath = inner.substr(slash + 1);
-					var txt = backend.ZipModManager.getText(modName, innerPath);
-					list = txt != null ? CoolUtil.listFromString(txt) : [];
-				} else list = [];
-			}
-			else
-				list = CoolUtil.coolTextFile(file);
-
+			var list:Array<String> = CoolUtil.coolTextFile(file);
 			for (value in list)
 				if((allowDuplicates || !mergedList.contains(value)) && value.length > 0)
 					mergedList.push(value);
 		}
+
 		return mergedList;
 	}
 
@@ -145,12 +128,7 @@ class Mods
 				if(FileSystem.exists(folder) && !foldersToCheck.contains(folder)) foldersToCheck.push(folder);
 			}
 
-			for (zipMod in backend.ZipModManager.getModNames())
-			{
-				var zipKey = 'zip:$zipMod/$fileToFind';
-				if (backend.ZipModManager.exists(zipMod, fileToFind) && !foldersToCheck.contains(zipKey))
-					foldersToCheck.push(zipKey);
-			}
+
 		}
 		#end
 		return foldersToCheck;
@@ -259,11 +237,12 @@ class Mods
 	public static function loadTopMod()
 	{
 		Mods.currentModDirectory = '';
-		
+
 		#if MODS_ALLOWED
 		var list:Array<String> = Mods.parseList().enabled;
 		if(list != null && list[0] != null)
 			Mods.currentModDirectory = list[0];
 		#end
 	}
+
 }

@@ -4,6 +4,7 @@ package psychlua;
 import backend.WeekData;
 import backend.Highscore;
 import backend.Song;
+import backend.LocalEngineVersion;
 
 import openfl.Lib;
 import openfl.utils.Assets;
@@ -131,7 +132,7 @@ class FunkinLua {
 		set('rating', 0);
 		set('ratingName', '');
 		set('ratingFC', '');
-		set('version', MainMenuState.psychEngineVersion.trim());
+		set('version', LocalEngineVersion.VERSION.trim());
 
 		set('inGameOver', false);
 		set('mustHitSection', false);
@@ -1510,34 +1511,24 @@ class FunkinLua {
 		ShaderFunctions.implement(this);
 		DeprecatedFunctions.implement(this);
 
-		try {
-			var bytes:haxe.io.Bytes = null;
+		try{
 			var isString:Bool = !FileSystem.exists(scriptName);
-			
-			if(!isString) {
-				bytes = FileSystem.getBytes(scriptName);
-			} else {
-				bytes = haxe.io.Bytes.ofString(scriptName);
-			}
+			var result:Dynamic = null;
+			if(!isString)
+				result = LuaL.dofile(lua, scriptName);
+			else
+				result = LuaL.dostring(lua, scriptName);
 
-			var status:Int = LuaL.loadbuffer(lua, bytes.toString(), bytes.length, "=" + scriptName);
-			
-			if (status == 0) {
-				status = Lua.pcall(lua, 0, Lua.MULTRET, 0);
-			}
-
-			if(status != 0) {
-				var resultStr:String = Lua.tostring(lua, -1);
-				if(resultStr != null) {
-					trace(resultStr);
-					#if windows
-					lime.app.Application.current.window.alert(resultStr, 'Error on lua script!');
-					#else
-					luaTrace('$scriptName\n$resultStr', true, false, FlxColor.RED);
-					#end
-					lua = null;
-					return;
-				}
+			var resultStr:String = Lua.tostring(lua, result);
+			if(resultStr != null && result != 0) {
+				trace(resultStr);
+				#if windows
+				lime.app.Application.current.window.alert(resultStr, 'Error on lua script!');
+				#else
+				luaTrace('$scriptName\n$resultStr', true, false, FlxColor.RED);
+				#end
+				lua = null;
+				return;
 			}
 			if(isString) scriptName = 'unknown';
 		} catch(e:Dynamic) {
