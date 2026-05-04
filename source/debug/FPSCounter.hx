@@ -40,7 +40,11 @@ class FPSCounter extends Sprite
 		textField = new TextField();
 		textField.selectable = false;
 		textField.mouseEnabled = false;
+		#if (debug || dev)
 		textField.defaultTextFormat = new TextFormat(Paths.font("vcr.ttf"), 14, color);
+		#else
+		textField.defaultTextFormat = new TextFormat(Paths.font("vcr.ttf"), 10, color);
+		#end
 		textField.autoSize = LEFT;
 		textField.multiline = true;
 		addChild(textField);
@@ -85,9 +89,15 @@ class FPSCounter extends Sprite
 		if (memMB > highestMem)
 			highestMem = memMB;
 
+		#if (debug || dev)
 		var out:String = 'FPS: $currentFPS'
 			+ '\nMemory: ${memMB} MB'
 			+ '\nMem Peak: ${highestMem} MB';
+		#else
+		var out:String = 'FPS: $currentFPS'
+			+ ' - MM: ${memMB} MB'
+			+ '/MP: ${highestMem} MB';
+		#end
 
 		#if (debug || dev)
 		out += '\n$_shortInfo';
