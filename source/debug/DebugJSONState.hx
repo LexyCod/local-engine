@@ -13,7 +13,6 @@ import backend.Difficulty;
 import states.PlayState;
 import sys.FileSystem;
 
-#if (debug || dev)
 class DebugJSONState extends FlxState
 {
     var songs:Array<String> = [];
@@ -177,4 +176,3 @@ class DebugJSONState extends FlxState
         }
     }
 }
-#end

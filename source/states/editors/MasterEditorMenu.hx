@@ -125,7 +125,7 @@ class MasterEditorMenu extends MusicBeatState
 				case 'Note Splash Debug':
 					MusicBeatState.switchState(new NoteSplashDebugState());
 				case 'JSON State':
-					#if (debug || dev) FlxG.switchState(new DebugJSONState()); #end
+					FlxG.switchState(new DebugJSONState());
 			}
 			FlxG.sound.music.volume = 0;
 			FreeplayState.destroyFreeplayVocals();

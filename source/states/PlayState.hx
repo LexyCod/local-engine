@@ -175,6 +175,7 @@ class PlayState extends MusicBeatState
 	public var opponentStrums:FlxTypedGroup<StrumNote>;
 	public var playerStrums:FlxTypedGroup<StrumNote>;
 	public var grpNoteSplashes:FlxTypedGroup<NoteSplash>;
+	public var holdNoteCovers:FlxTypedGroup<HoldNoteCover>;
 
 	private var camTargetX:Float = 0;
 	private var camTargetY:Float = 0;
@@ -329,6 +330,7 @@ class PlayState extends MusicBeatState
 		FlxG.cameras.add(camHUD, false);
 		FlxG.cameras.add(camOther, false);
 		grpNoteSplashes = new FlxTypedGroup<NoteSplash>();
+		holdNoteCovers = new FlxTypedGroup<HoldNoteCover>();
 
 		persistentUpdate = true;
 		persistentDraw = true;
@@ -529,6 +531,7 @@ class PlayState extends MusicBeatState
 			timeTxt.size = 24;
 			timeTxt.y += 3;
 		}
+		noteGroup.add(holdNoteCovers);
 
 		var splash:NoteSplash = new NoteSplash(100, 100);
 		grpNoteSplashes.add(splash);
@@ -1749,6 +1752,21 @@ class PlayState extends MusicBeatState
 			noteCamOffsetX = FlxMath.bound(noteCamOffsetX, -maxOffset, maxOffset);
 			noteCamOffsetY = FlxMath.bound(noteCamOffsetY, -maxOffset, maxOffset);
 		}
+
+		var controlArray:Array<String> = ['note_left', 'note_down', 'note_up', 'note_right'];
+
+		holdNoteCovers.forEachAlive(function(cover:HoldNoteCover) {
+			var strum = playerStrums.members[cover.strumId];
+			
+			cover.setPosition(strum.x + strum.width/2, strum.y + strum.height/2);
+			cover.alpha = strum.alpha;
+
+			if (controls.justReleased(controlArray[cover.strumId])) {
+				if (cover.animation.curAnim.name != 'end') {
+					cover.playAnim('end');
+				}
+			}
+		});
 
 		super.update(elapsed);
 
@@ -3094,6 +3112,18 @@ class PlayState extends MusicBeatState
 			if(!note.noteSplashData.disabled && !note.isSustainNote) spawnNoteSplashOnNote(note);
 			if(!note.isSustainNote) invalidateNote(note);
 			return;
+		}
+
+		if (note.isSustainNote && ClientPrefs.data.holdNoteCovers) {
+			var hasCover:Bool = false;
+			holdNoteCovers.forEachAlive(function(cover:HoldNoteCover) {
+				if(cover.strumId == note.noteData) hasCover = true;
+			});
+
+			if (!hasCover) {
+				var cover:HoldNoteCover = new HoldNoteCover(playerStrums.members[note.noteData]);
+				holdNoteCovers.add(cover);
+			}
 		}
 
 		if(!note.noAnimation) {

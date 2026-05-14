@@ -110,15 +110,9 @@ class Main extends Sprite
 		ClientPrefs.loadDefaultKeys();
 		#if ACHIEVEMENTS_ALLOWED Achievements.load(); #end
 
-		Lib.current.stage.addEventListener(openfl.events.Event.RESIZE, function(e) {
-			if (FlxG.game.soundTray != null) {
-				FlxG.game.soundTray.x = (Lib.current.stage.stageWidth - FlxG.game.soundTray.width) / 2;
-			}
-		});
-
 		addChild(new FlxGame(game.width, game.height, game.initialState, #if (flixel < "5.0.0") game.zoom, #end game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
-		FlxG.scaleMode = new RatioScaleMode(true);
-		//FlxG.scaleMode = new flixel.system.scaleModes.FillScaleMode();
+		
+		FlxG.scaleMode = new RatioScaleMode(false);
 
 		#if !mobile
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);
