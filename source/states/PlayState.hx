@@ -1745,7 +1745,7 @@ class PlayState extends MusicBeatState
 			noteCamOffsetX += (0 - noteCamOffsetX) * decay;
 			noteCamOffsetY += (0 - noteCamOffsetY) * decay;
 
-			final maxOffset = 5.0;
+			final maxOffset = 1.0;
 			noteCamOffsetX = FlxMath.bound(noteCamOffsetX, -maxOffset, maxOffset);
 			noteCamOffsetY = FlxMath.bound(noteCamOffsetY, -maxOffset, maxOffset);
 		}
