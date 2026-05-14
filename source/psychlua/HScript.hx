@@ -53,6 +53,19 @@ class HScript extends SScript
 			file = '';
 
 		this.varsToBring = varsToBring;
+		var originalFile:String = file;
+		var loadedFromVirtualPath:Bool = false;
+		#if sys
+		if (file.length > 0 && !FileSystem.exists(file))
+		{
+			var virtualCode:String = Paths.getTextFromFile(file);
+			if (virtualCode != null)
+			{
+				file = virtualCode;
+				loadedFromVirtualPath = true;
+			}
+		}
+		#end
 	
 		super(file, false, false);
 
@@ -65,7 +78,18 @@ class HScript extends SScript
 		}
 		#end
 
-		if (scriptFile != null && scriptFile.length > 0)
+		if (loadedFromVirtualPath)
+		{
+			this.origin = originalFile;
+			customOrigin = originalFile;
+			SScript.global[originalFile] = this;
+			#if MODS_ALLOWED
+			var myFolder:Array<String> = originalFile.split('/');
+			if(myFolder[0] + '/' == Paths.mods() && (Mods.currentModDirectory == myFolder[1] || Mods.getGlobalMods().contains(myFolder[1])))
+				this.modFolder = myFolder[1];
+			#end
+		}
+		else if (scriptFile != null && scriptFile.length > 0)
 		{
 			this.origin = scriptFile;
 			#if MODS_ALLOWED

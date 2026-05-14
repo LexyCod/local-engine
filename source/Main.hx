@@ -9,6 +9,7 @@ import debug.FPSCounter;
 import flixel.graphics.FlxGraphic;
 import flixel.FlxGame;
 import flixel.FlxState;
+import flixel.system.scaleModes.RatioScaleMode;
 import haxe.io.Path;
 import openfl.Assets;
 import openfl.Lib;
@@ -110,6 +111,7 @@ class Main extends Sprite
 		#if ACHIEVEMENTS_ALLOWED Achievements.load(); #end
 
 		addChild(new FlxGame(game.width, game.height, game.initialState, #if (flixel < "5.0.0") game.zoom, #end game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
+		FlxG.scaleMode = new RatioScaleMode(true);
 
 		#if !mobile
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);

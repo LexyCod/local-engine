@@ -5,6 +5,8 @@ package backend;
 
 class PsychCamera extends FlxCamera
 {
+	public var coverRotatedCorners:Bool = true;
+
 	override public function update(elapsed:Float):Void
 	{
 		// follow the target, if there is one
@@ -21,6 +23,49 @@ class PsychCamera extends FlxCamera
 
 		updateFlashSpritePosition();
 		updateShake(elapsed);
+	}
+
+	override function set_angle(value:Float):Float
+	{
+		angle = value;
+		flashSprite.rotation = value;
+		updateRotationCoverScale();
+		return value;
+	}
+
+	override public function setScale(X:Float, Y:Float):Void
+	{
+		super.setScale(X, Y);
+		updateRotationCoverScale();
+	}
+
+	override public function onResize():Void
+	{
+		super.onResize();
+		updateRotationCoverScale();
+	}
+
+	function updateRotationCoverScale():Void
+	{
+		if (flashSprite == null) return;
+
+		var coverScale:Float = 1;
+		if (coverRotatedCorners && width > 0 && height > 0)
+		{
+			var degrees:Float = Math.abs(angle % 180);
+			if (degrees > 0.001)
+			{
+				var radians:Float = degrees * Math.PI / 180;
+				var sin:Float = Math.abs(Math.sin(radians));
+				var cos:Float = Math.abs(Math.cos(radians));
+				var coverW:Float = (width * cos + height * sin) / width;
+				var coverH:Float = (width * sin + height * cos) / height;
+				coverScale = Math.max(coverW, coverH) + 0.01;
+			}
+		}
+
+		flashSprite.scaleX = coverScale;
+		flashSprite.scaleY = coverScale;
 	}
 
 	public function updateFollowDelta(?elapsed:Float = 0):Void

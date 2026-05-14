@@ -46,6 +46,17 @@ class Paths
 		return key;
 	}
 
+	public static function getModRootPaths():Array<String>
+	{
+		return ZipModManager.modRootPaths();
+	}
+
+	static function stripLibraryPrefix(path:String):String
+	{
+		var colon:Int = path.indexOf(':');
+		return colon >= 0 ? path.substr(colon + 1) : path;
+	}
+
 	public static var dumpExclusions:Array<String> = ['assets/shared/music/freakyMenu.$SOUND_EXT'];
 	/// haya I love you for the base cache dump I took to the max
 	public static function clearUnusedMemory() {
@@ -262,6 +273,15 @@ class Paths
 			}
 			else if (OpenFlAssets.exists(file, IMAGE))
 				bitmap = OpenFlAssets.getBitmapData(file);
+			else
+			{
+				var assetBytes = ZipModManager.getAssetBytes(file);
+				if (assetBytes != null)
+				{
+					bitmap = bitmapFromBytes(assetBytes);
+					file = ZipModManager.getAssetId(file);
+				}
+			}
 		}
 
 		if (bitmap != null)
@@ -287,6 +307,15 @@ class Paths
 			{
 				if (OpenFlAssets.exists(file, IMAGE))
 					bitmap = OpenFlAssets.getBitmapData(file);
+				else
+				{
+					var assetBytes = ZipModManager.getAssetBytes(file);
+					if (assetBytes != null)
+					{
+						bitmap = bitmapFromBytes(assetBytes);
+						file = ZipModManager.getAssetId(file);
+					}
+				}
 			}
 
 			if(bitmap == null) return null;
@@ -315,43 +344,81 @@ class Paths
 		return bytes != null ? BitmapData.fromBytes(ByteArray.fromBytes(bytes)) : null;
 	}
 
+	static public function getBytesFromFile(key:String, ?ignoreMods:Bool = false):Bytes
+	{
+		key = normalizePath(key);
+		if (key.startsWith('zip://'))
+			return ZipModManager.getBytesFromId(key);
+
+		#if sys
+		#if MODS_ALLOWED
+		if (!ignoreMods)
+		{
+			var modBytes = getModFileBytes(key);
+			if (modBytes != null) return modBytes;
+		}
+		#end
+
+		if (FileSystem.exists(key) && !FileSystem.isDirectory(key))
+			return File.getBytes(key);
+
+		#if MODS_ALLOWED
+		if (!ignoreMods)
+		{
+			var modPath:String = modFolders(key);
+			if (FileSystem.exists(modPath) && !FileSystem.isDirectory(modPath))
+				return File.getBytes(modPath);
+		}
+		#end
+
+		var sharedPath:String = getSharedPath(key);
+		if (FileSystem.exists(sharedPath) && !FileSystem.isDirectory(sharedPath))
+			return File.getBytes(sharedPath);
+
+		if (currentLevel != null && currentLevel != 'shared')
+		{
+			var levelPath:String = stripLibraryPrefix(getLibraryPathForce(key, 'week_assets', currentLevel));
+			if (FileSystem.exists(levelPath) && !FileSystem.isDirectory(levelPath))
+				return File.getBytes(levelPath);
+		}
+		#end
+
+		var path:String = getPath(key, BINARY);
+		try
+		{
+			if(OpenFlAssets.exists(path, BINARY) || OpenFlAssets.exists(path, TEXT))
+				return OpenFlAssets.getBytes(path);
+			if(OpenFlAssets.exists(key, BINARY) || OpenFlAssets.exists(key, TEXT))
+				return OpenFlAssets.getBytes(key);
+		}
+		catch(e:Dynamic) {}
+
+		#if sys
+		var assetBytes = ZipModManager.getAssetBytes(path);
+		if (assetBytes != null) return assetBytes;
+		assetBytes = ZipModManager.getAssetBytes(key);
+		if (assetBytes != null) return assetBytes;
+		#end
+
+		return null;
+	}
+
 	static public function getTextFromFile(key:String, ?ignoreMods:Bool = false):String
 	{
 		key = normalizePath(key);
-		#if sys
-		#if MODS_ALLOWED
-		if (!ignoreMods) {
-		}
+		var bytes:Bytes = getBytesFromFile(key, ignoreMods);
+		if (bytes != null) return bytes.toString();
 
-		if (!ignoreMods) {
-			var modText = getModFileText(key);
-			if (modText != null) return modText;
-		}
-
-		if (FileSystem.exists(key))
-			return File.getContent(key);
-
-		if (!ignoreMods && FileSystem.exists(modFolders(key)))
-			return File.getContent(modFolders(key));
-		#end
-
-
-		if (FileSystem.exists(getSharedPath(key)))
-			return File.getContent(getSharedPath(key));
-
-		if (currentLevel != null)
-		{
-			var levelPath:String = '';
-			if(currentLevel != 'shared') {
-				levelPath = getLibraryPathForce(key, 'week_assets', currentLevel);
-				if (FileSystem.exists(levelPath))
-					return File.getContent(levelPath);
-			}
-		}
-		#end
 		var path:String = getPath(key, TEXT);
 		if(OpenFlAssets.exists(path, TEXT)) return Assets.getText(path);
 		if(OpenFlAssets.exists(key, TEXT)) return Assets.getText(key);
+
+		#if sys
+		var assetText = ZipModManager.getAssetText(path);
+		if (assetText != null) return assetText;
+		assetText = ZipModManager.getAssetText(key);
+		if (assetText != null) return assetText;
+		#end
 		return null;
 	}
 
@@ -368,6 +435,7 @@ class Paths
 
 	public static function fileExists(key:String, type:AssetType, ?ignoreMods:Bool = false, ?library:String = null)
 	{
+		key = normalizePath(key);
 		#if MODS_ALLOWED
 		if(!ignoreMods)
 		{
@@ -386,9 +454,21 @@ class Paths
 		}
 		#end
 
+		#if sys
+		if(FileSystem.exists(key))
+			return true;
+		var sharedPath:String = getSharedPath(key);
+		if(FileSystem.exists(sharedPath))
+			return true;
+		#end
+
 		if(OpenFlAssets.exists(getPath(key, type, library, false))) {
 			return true;
 		}
+		#if sys
+		if(ZipModManager.assetExists(getPath(key, type, library, false)) || ZipModManager.assetExists(key))
+			return true;
+		#end
 		return false;
 	}
 
@@ -408,6 +488,10 @@ class Paths
 
 		var assetPath = getPath(relativePath, TEXT, library);
 		if (OpenFlAssets.exists(assetPath, TEXT)) return OpenFlAssets.getText(assetPath);
+		var zipText = ZipModManager.getAssetText(assetPath);
+		if (zipText != null) return zipText;
+		zipText = ZipModManager.getAssetText(relativePath);
+		if (zipText != null) return zipText;
 		return null;
 	}
 
@@ -480,7 +564,11 @@ class Paths
 			var cacheKey:String = asset.id;
 			if(!currentTrackedSounds.exists(cacheKey))
 			{
-				var sound:Sound = AudioBackend.fromFile(asset.file);
+				var sound:Sound = null;
+				if (Reflect.hasField(asset, "bytes") && asset.bytes != null)
+					sound = AudioBackend.fromBytes(asset.bytes, asset.id);
+				else if (Reflect.hasField(asset, "file") && asset.file != null)
+					sound = AudioBackend.fromFile(asset.file);
 				if (sound != null)
 					currentTrackedSounds.set(cacheKey, sound);
 			}
@@ -525,6 +613,16 @@ class Paths
 					if(FileSystem.exists(filePath))
 						sound = AudioBackend.fromFile(filePath);
 				}
+
+				if(sound == null)
+				{
+					var assetBytes = ZipModManager.getAssetBytes(assetPath);
+					if (assetBytes != null)
+					{
+						cacheKey = ZipModManager.getAssetId(assetPath);
+						sound = AudioBackend.fromBytes(assetBytes, assetPath);
+					}
+				}
 				#end
 
 				if(sound != null)
@@ -548,6 +646,17 @@ class Paths
 		var strippedKey = key;
 		if (key.startsWith("assets/")) strippedKey = key.substr(7);
 
+		var rooted:Dynamic = splitModRootedKey(strippedKey);
+		if (rooted != null)
+		{
+			strippedKey = rooted.key;
+			if (rooted.mod != null)
+			{
+				var rootedAsset = findAssetInMod(rooted.mod, strippedKey);
+				if (rootedAsset != null) return rootedAsset;
+			}
+		}
+
 		if (folder != null && folder.length > 0)
 			return findAssetInMod(folder, strippedKey);
 
@@ -564,8 +673,8 @@ class Paths
 		}
 
 
-		var looseFile = mods(key);
-		if (FileSystem.exists(looseFile))
+		var looseFile = findLooseModFile(strippedKey);
+		if (looseFile != null)
 			return {id: looseFile, file: looseFile};
 
 		return null;
@@ -575,11 +684,59 @@ class Paths
 	{
 		if (mod == null || mod.length < 1) return null;
 
-		var file = mods(mod + '/' + key);
-		if (FileSystem.exists(file))
+		var file = findPhysicalModFile(mod, key);
+		if (file != null)
 			return {id: file, file: file};
 
+		var zipAsset = ZipModManager.getModAsset(mod, key);
+		if (zipAsset != null)
+			return zipAsset;
 
+		return null;
+	}
+
+	static function splitModRootedKey(key:String):Dynamic
+	{
+		for (root in getModRootPaths())
+		{
+			var prefix = root + '/';
+			if (!key.startsWith(prefix)) continue;
+
+			var rest = key.substr(prefix.length);
+			var slash = rest.indexOf('/');
+			if (slash > 0)
+			{
+				var mod = rest.substr(0, slash);
+				var inside = rest.substr(slash + 1);
+				if (Mods.modExists(mod))
+					return {mod: mod, key: inside};
+			}
+			return {mod: null, key: rest};
+		}
+		return null;
+	}
+
+	static function findPhysicalModFile(mod:String, key:String):String
+	{
+		if (mod == null || mod.length < 1) return null;
+
+		for (root in getModRootPaths())
+		{
+			var file = root + '/' + mod + '/' + key;
+			if (FileSystem.exists(file) && !FileSystem.isDirectory(file))
+				return file;
+		}
+		return null;
+	}
+
+	static function findLooseModFile(key:String):String
+	{
+		for (root in getModRootPaths())
+		{
+			var file = root + '/' + key;
+			if (FileSystem.exists(file) && !FileSystem.isDirectory(file))
+				return file;
+		}
 		return null;
 	}
 
@@ -592,17 +749,25 @@ class Paths
 	{
 		var asset = findModAsset(key, folder);
 		if (asset == null) return null;
-		return File.getBytes(asset.file);
+		if (Reflect.hasField(asset, "bytes") && asset.bytes != null)
+			return asset.bytes;
+		if (Reflect.hasField(asset, "file") && asset.file != null)
+			return File.getBytes(asset.file);
+		return null;
 	}
 
 	public static function getModFileText(key:String, ?folder:String):String
 	{
 		var asset = findModAsset(key, folder);
 		if (asset == null) return null;
-		return File.getContent(asset.file);
+		if (Reflect.hasField(asset, "bytes") && asset.bytes != null)
+			return asset.bytes.toString();
+		if (Reflect.hasField(asset, "file") && asset.file != null)
+			return File.getContent(asset.file);
+		return null;
 	}
 
-	static function getModAssetId(key:String, ?folder:String):String
+	public static function getModAssetId(key:String, ?folder:String):String
 	{
 		var asset = findModAsset(key, folder);
 		return asset != null ? asset.id : mods(key);
@@ -660,18 +825,19 @@ class Paths
 
 	static public function modFolders(key:String) {
 		if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0) {
-			var fileToCheck:String = mods(Mods.currentModDirectory + '/' + key);
-			if(FileSystem.exists(fileToCheck)) {
+			var fileToCheck:String = findPhysicalModFile(Mods.currentModDirectory, key);
+			if(fileToCheck != null) {
 				return fileToCheck;
 			}
 		}
 
 		for(mod in Mods.getGlobalMods()){
-			var fileToCheck:String = mods(mod + '/' + key);
-			if(FileSystem.exists(fileToCheck))
+			var fileToCheck:String = findPhysicalModFile(mod, key);
+			if(fileToCheck != null)
 				return fileToCheck;
 		}
-		return 'content/' + key;
+		var looseFile:String = findLooseModFile(key);
+		return looseFile != null ? looseFile : 'content/' + key;
 	}
 	#end
 

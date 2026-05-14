@@ -10,6 +10,7 @@ import backend.NotePool;
 import backend.CacheManager;
 import backend.AsyncSongLoader;
 import backend.LocalEngineVersion;
+import backend.ZipModManager;
 
 import flixel.FlxBasic;
 import flixel.FlxObject;
@@ -442,18 +443,12 @@ class PlayState extends MusicBeatState
 		// "GLOBAL" SCRIPTS
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
 		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'scripts/'))
-			for (file in FileSystem.readDirectory(folder))
-			{
-				#if LUA_ALLOWED
-				if(file.toLowerCase().endsWith('.lua'))
-					new FunkinLua(folder + file);
-				#end
-
-				#if HSCRIPT_ALLOWED
-				if(file.toLowerCase().endsWith('.hx'))
-					initHScript(folder + file);
-				#end
-			}
+			loadScriptDirectory(folder);
+		#if MODS_ALLOWED
+		loadLooseScriptDirectory('scripts/');
+		for (mod in Mods.parseList().enabled)
+			loadModScriptDirectory(mod, 'scripts/');
+		#end
 		#end
 
 		// STAGE SCRIPTS
@@ -635,18 +630,12 @@ class PlayState extends MusicBeatState
 		// SONG SPECIFIC SCRIPTS
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
 		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'data/$songName/'))
-			for (file in FileSystem.readDirectory(folder))
-			{
-				#if LUA_ALLOWED
-				if(file.toLowerCase().endsWith('.lua'))
-					new FunkinLua(folder + file);
-				#end
-
-				#if HSCRIPT_ALLOWED
-				if(file.toLowerCase().endsWith('.hx'))
-					initHScript(folder + file);
-				#end
-			}
+			loadScriptDirectory(folder);
+		#if MODS_ALLOWED
+		loadLooseScriptDirectory('data/$songName/');
+		for (mod in Mods.parseList().enabled)
+			loadModScriptDirectory(mod, 'data/$songName/');
+		#end
 		#end
 
 		startCallback();
@@ -778,6 +767,60 @@ class PlayState extends MusicBeatState
 		}
 	}
 
+	#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
+	function loadScriptDirectory(folder:String):Void
+	{
+		#if sys
+		if(folder == null || !FileSystem.exists(folder) || !FileSystem.isDirectory(folder)) return;
+		for (file in FileSystem.readDirectory(folder))
+			loadScriptPath(folder + file);
+		#end
+	}
+
+	#if MODS_ALLOWED
+	function loadLooseScriptDirectory(folder:String):Void
+	{
+		for (root in Paths.getModRootPaths())
+			loadScriptDirectory(root + '/' + folder);
+	}
+
+	function loadModScriptDirectory(mod:String, folder:String):Void
+	{
+		for (root in Paths.getModRootPaths())
+			loadScriptDirectory(root + '/' + mod + '/' + folder);
+
+		for (zipPath in ZipModManager.listModFiles(mod, folder))
+		{
+			var lower:String = zipPath.toLowerCase();
+			if(lower.endsWith('.lua') || lower.endsWith('.hx'))
+				loadScriptPath(Paths.getModAssetId(zipPath, mod));
+		}
+	}
+	#end
+
+	function loadScriptPath(path:String):Void
+	{
+		var lower:String = path.toLowerCase();
+		#if LUA_ALLOWED
+		if(lower.endsWith('.lua'))
+		{
+			for (script in luaArray)
+				if(script.scriptName == path) return;
+			new FunkinLua(path);
+			return;
+		}
+		#end
+
+		#if HSCRIPT_ALLOWED
+		if(lower.endsWith('.hx'))
+		{
+			if(SScript.global.exists(path)) return;
+			initHScript(path);
+		}
+		#end
+	}
+	#end
+
 	function startCharacterScripts(name:String)
 	{
 		// Lua
@@ -791,10 +834,15 @@ class PlayState extends MusicBeatState
 			luaFile = replacePath;
 			doPush = true;
 		}
+		else if(Paths.modFileExists(luaFile))
+		{
+			luaFile = Paths.getModAssetId(luaFile);
+			doPush = true;
+		}
 		else
 		{
 			luaFile = Paths.getSharedPath(luaFile);
-			if(FileSystem.exists(luaFile))
+			if(FileSystem.exists(luaFile) || Paths.getTextFromFile(luaFile, true) != null)
 				doPush = true;
 		}
 		#else
@@ -827,11 +875,16 @@ class PlayState extends MusicBeatState
 			scriptFile = replacePath;
 			doPush = true;
 		}
+		else if(Paths.modFileExists(scriptFile))
+		{
+			scriptFile = Paths.getModAssetId(scriptFile);
+			doPush = true;
+		}
 		else
 		#end
 		{
 			scriptFile = Paths.getSharedPath(scriptFile);
-			if(FileSystem.exists(scriptFile))
+			if(FileSystem.exists(scriptFile) || Paths.getTextFromFile(scriptFile, true) != null)
 				doPush = true;
 		}
 
@@ -3258,9 +3311,14 @@ class PlayState extends MusicBeatState
 		#if MODS_ALLOWED
 		var luaToLoad:String = Paths.modFolders(luaFile);
 		if(!FileSystem.exists(luaToLoad))
-			luaToLoad = Paths.getSharedPath(luaFile);
+		{
+			if(Paths.modFileExists(luaFile))
+				luaToLoad = Paths.getModAssetId(luaFile);
+			else
+				luaToLoad = Paths.getSharedPath(luaFile);
+		}
 
-		if(FileSystem.exists(luaToLoad))
+		if(FileSystem.exists(luaToLoad) || Paths.getTextFromFile(luaToLoad, true) != null)
 		#elseif sys
 		var luaToLoad:String = Paths.getSharedPath(luaFile);
 		if(OpenFlAssets.exists(luaToLoad))
@@ -3282,12 +3340,17 @@ class PlayState extends MusicBeatState
 		#if MODS_ALLOWED
 		var scriptToLoad:String = Paths.modFolders(scriptFile);
 		if(!FileSystem.exists(scriptToLoad))
-			scriptToLoad = Paths.getSharedPath(scriptFile);
+		{
+			if(Paths.modFileExists(scriptFile))
+				scriptToLoad = Paths.getModAssetId(scriptFile);
+			else
+				scriptToLoad = Paths.getSharedPath(scriptFile);
+		}
 		#else
 		var scriptToLoad:String = Paths.getSharedPath(scriptFile);
 		#end
 
-		if(FileSystem.exists(scriptToLoad))
+		if(FileSystem.exists(scriptToLoad) || Paths.getTextFromFile(scriptToLoad, true) != null)
 		{
 			if (SScript.global.exists(scriptToLoad)) return false;
 

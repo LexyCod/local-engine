@@ -49,16 +49,20 @@ class Mods
 	{
 		var list:Array<String> = [];
 		#if MODS_ALLOWED
-		var modsFolder:String = Paths.mods();
-		if(FileSystem.exists(modsFolder)) {
+		for (modsFolder in Paths.getModRootPaths())
+		{
+			if(!FileSystem.exists(modsFolder) || !FileSystem.isDirectory(modsFolder)) continue;
 			for (folder in FileSystem.readDirectory(modsFolder))
 			{
 				var path = haxe.io.Path.join([modsFolder, folder]);
 				if (FileSystem.isDirectory(path) && !ignoreModFolders.contains(folder.toLowerCase()) && !list.contains(folder))
 					list.push(folder);
 			}
-
 		}
+
+		for (folder in ZipModManager.getModNames())
+			if (!ignoreModFolders.contains(folder.toLowerCase()) && !list.contains(folder))
+				list.push(folder);
 		#end
 		return list;
 	}
@@ -67,8 +71,13 @@ class Mods
 	{
 		#if MODS_ALLOWED
 		if (folder == null || folder.trim().length < 1) return false;
-		var path = Paths.mods(folder);
-		return (FileSystem.exists(path) && FileSystem.isDirectory(path));
+		for (root in Paths.getModRootPaths())
+		{
+			var path = root + '/' + folder;
+			if (FileSystem.exists(path) && FileSystem.isDirectory(path))
+				return true;
+		}
+		return ZipModManager.hasMod(folder);
 		#else
 		return false;
 		#end
@@ -106,7 +115,7 @@ class Mods
 	{
 		var foldersToCheck:Array<String> = [];
 		#if sys
-		if(FileSystem.exists(path + fileToFind))
+		if(FileSystem.exists(path + fileToFind) || Paths.getTextFromFile(path + fileToFind, true) != null)
 		#end
 			foldersToCheck.push(path + fileToFind);
 
@@ -116,16 +125,16 @@ class Mods
 			for(mod in Mods.getGlobalMods())
 			{
 				var folder:String = Paths.mods(mod + '/' + fileToFind);
-				if(FileSystem.exists(folder) && !foldersToCheck.contains(folder)) foldersToCheck.push(folder);
+				if((FileSystem.exists(folder) || Paths.getTextFromFile(folder) != null) && !foldersToCheck.contains(folder)) foldersToCheck.push(folder);
 			}
 
 			var folder:String = Paths.mods(fileToFind);
-			if(FileSystem.exists(folder) && !foldersToCheck.contains(folder)) foldersToCheck.push(Paths.mods(fileToFind));
+			if((FileSystem.exists(folder) || Paths.getTextFromFile(folder) != null) && !foldersToCheck.contains(folder)) foldersToCheck.push(Paths.mods(fileToFind));
 
 			if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
 			{
 				var folder:String = Paths.mods(Mods.currentModDirectory + '/' + fileToFind);
-				if(FileSystem.exists(folder) && !foldersToCheck.contains(folder)) foldersToCheck.push(folder);
+				if((FileSystem.exists(folder) || Paths.getTextFromFile(folder) != null) && !foldersToCheck.contains(folder)) foldersToCheck.push(folder);
 			}
 
 

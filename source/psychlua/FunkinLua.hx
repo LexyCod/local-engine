@@ -73,7 +73,14 @@ class FunkinLua {
 
 		var myFolder:Array<String> = this.scriptName.split('/');
 		#if MODS_ALLOWED
-		if(myFolder[0] + '/' == Paths.mods() && (Mods.currentModDirectory == myFolder[1] || Mods.getGlobalMods().contains(myFolder[1]))) //is inside mods folder
+		if(this.scriptName.startsWith('zip://mod/'))
+		{
+			var zipRest:String = this.scriptName.substr('zip://mod/'.length);
+			var slash:Int = zipRest.indexOf('/');
+			if(slash > 0)
+				this.modFolder = zipRest.substr(0, slash);
+		}
+		else if(myFolder[0] + '/' == Paths.mods() && (Mods.currentModDirectory == myFolder[1] || Mods.getGlobalMods().contains(myFolder[1]))) //is inside mods folder
 			this.modFolder = myFolder[1];
 		#end
 
@@ -1512,12 +1519,15 @@ class FunkinLua {
 		DeprecatedFunctions.implement(this);
 
 		try{
+			var scriptCode:String = null;
 			var isString:Bool = !FileSystem.exists(scriptName);
+			if(isString)
+				scriptCode = Paths.getTextFromFile(scriptName);
 			var result:Dynamic = null;
 			if(!isString)
 				result = LuaL.dofile(lua, scriptName);
 			else
-				result = LuaL.dostring(lua, scriptName);
+				result = LuaL.dostring(lua, scriptCode != null ? scriptCode : scriptName);
 
 			var resultStr:String = Lua.tostring(lua, result);
 			if(resultStr != null && result != 0) {
@@ -1530,7 +1540,7 @@ class FunkinLua {
 				lua = null;
 				return;
 			}
-			if(isString) scriptName = 'unknown';
+			if(isString && scriptCode == null) scriptName = 'unknown';
 		} catch(e:Dynamic) {
 			trace(e);
 			return;
@@ -1663,8 +1673,10 @@ class FunkinLua {
 			return scriptFile;
 		else if(FileSystem.exists(path))
 			return path;
+		else if(Paths.modFileExists(scriptFile))
+			return Paths.getModAssetId(scriptFile);
 
-		if(FileSystem.exists(preloadPath))
+		if(FileSystem.exists(preloadPath) || Paths.getTextFromFile(preloadPath, true) != null)
 		#else
 		if(Assets.exists(preloadPath))
 		#end

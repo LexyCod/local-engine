@@ -112,17 +112,15 @@ class WeekData {
 		#if MODS_ALLOWED
 		for (i in 0...directories.length) {
 			var directory:String = directories[i] + 'weeks/';
-			if(FileSystem.exists(directory)) {
-				var listOfWeeks:Array<String> = CoolUtil.coolTextFile(directory + 'weekList.txt');
-				for (daWeek in listOfWeeks)
-				{
-					var path:String = directory + daWeek + '.json';
-					if(FileSystem.exists(path))
-					{
-						addWeek(daWeek, path, directories[i], i, originalLength);
-					}
-				}
+			var listOfWeeks:Array<String> = CoolUtil.coolTextFile(directory + 'weekList.txt');
+			for (daWeek in listOfWeeks)
+			{
+				var path:String = directory + daWeek + '.json';
+				if(Paths.getTextFromFile(path) != null)
+					addWeek(daWeek, path, directories[i], i, originalLength);
+			}
 
+			if(FileSystem.exists(directory)) {
 				for (file in FileSystem.readDirectory(directory))
 				{
 					var path = haxe.io.Path.join([directory, file]);
@@ -130,6 +128,30 @@ class WeekData {
 					{
 						addWeek(file.substr(0, file.length - 5), path, directories[i], i, originalLength);
 					}
+				}
+			}
+
+			if (i >= originalLength)
+			{
+				var modName:String = directories[i].substring(Paths.mods().length, directories[i].length-1);
+				for (root in Paths.getModRootPaths())
+				{
+					var modWeeks:String = root + '/' + modName + '/weeks/';
+					if (modWeeks == directory || !FileSystem.exists(modWeeks)) continue;
+					for (file in FileSystem.readDirectory(modWeeks))
+					{
+						var path = haxe.io.Path.join([modWeeks, file]);
+						if (!FileSystem.isDirectory(path) && file.endsWith('.json'))
+							addWeek(file.substr(0, file.length - 5), path, directories[i], i, originalLength);
+					}
+				}
+
+				for (zipPath in ZipModManager.listModFiles(modName, 'weeks/', '.json'))
+				{
+					var slash:Int = zipPath.lastIndexOf('/');
+					var fileName:String = slash >= 0 ? zipPath.substr(slash + 1) : zipPath;
+					if (fileName != 'weekList.json')
+						addWeek(fileName.substr(0, fileName.length - 5), Paths.mods(modName + '/' + zipPath), directories[i], i, originalLength);
 				}
 			}
 		}
