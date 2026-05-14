@@ -60,7 +60,7 @@ class PsychCamera extends FlxCamera
 				var cos:Float = Math.abs(Math.cos(radians));
 				var coverW:Float = (width * cos + height * sin) / width;
 				var coverH:Float = (width * sin + height * cos) / height;
-				coverScale = Math.max(coverW, coverH) + 0.01;
+				coverScale = Math.max(coverW, coverH) - 0.5;
 			}
 		}
 
