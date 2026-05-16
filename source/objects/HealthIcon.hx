@@ -2,6 +2,8 @@ package objects;
 
 class HealthIcon extends FlxSprite
 {
+	public static final DEFAULT_LERP_RATE:Int = 12;
+
 	public var sprTracker:FlxSprite;
 	private var isOldIcon:Bool = false;
 	private var isPlayer:Bool = false;

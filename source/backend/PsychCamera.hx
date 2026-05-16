@@ -1,12 +1,11 @@
 package backend;
 
+import extensions.flixel.FlxCameraEx;
+
 // PsychCamera handles followLerp based on elapsed
 // and stops camera from snapping at higher framerates
-
-class PsychCamera extends FlxCamera
+class PsychCamera extends FlxCameraEx
 {
-	public var coverRotatedCorners:Bool = true;
-
 	override public function update(elapsed:Float):Void
 	{
 		// follow the target, if there is one
@@ -14,60 +13,17 @@ class PsychCamera extends FlxCamera
 		{
 			updateFollowDelta(elapsed);
 		}
-
+		
 		updateScroll();
 		updateFlash(elapsed);
 		updateFade(elapsed);
-
+		
 		flashSprite.filters = filtersEnabled ? filters : null;
-
+		
 		updateFlashSpritePosition();
 		updateShake(elapsed);
 	}
-
-	override function set_angle(value:Float):Float
-	{
-		angle = value;
-		flashSprite.rotation = value;
-		updateRotationCoverScale();
-		return value;
-	}
-
-	override public function setScale(X:Float, Y:Float):Void
-	{
-		super.setScale(X, Y);
-		updateRotationCoverScale();
-	}
-
-	override public function onResize():Void
-	{
-		super.onResize();
-		updateRotationCoverScale();
-	}
-
-	function updateRotationCoverScale():Void
-	{
-		if (flashSprite == null) return;
-
-		var coverScale:Float = 1;
-		if (coverRotatedCorners && width > 0 && height > 0)
-		{
-			var degrees:Float = Math.abs(angle % 180);
-			if (degrees > 0.001)
-			{
-				var radians:Float = degrees * Math.PI / 180;
-				var sin:Float = Math.abs(Math.sin(radians));
-				var cos:Float = Math.abs(Math.cos(radians));
-				var coverW:Float = (width * cos + height * sin) / width;
-				var coverH:Float = (width * sin + height * cos) / height;
-				coverScale = Math.max(coverW, coverH) - 0.5;
-			}
-		}
-
-		flashSprite.scaleX = coverScale;
-		flashSprite.scaleY = coverScale;
-	}
-
+	
 	public function updateFollowDelta(?elapsed:Float = 0):Void
 	{
 		// Either follow the object closely,
@@ -83,7 +39,7 @@ class PsychCamera extends FlxCamera
 			var edge:Float;
 			var targetX:Float = target.x + targetOffset.x;
 			var targetY:Float = target.y + targetOffset.y;
-
+			
 			if (style == SCREEN_BY_SCREEN)
 			{
 				if (targetX >= viewRight)
@@ -94,7 +50,7 @@ class PsychCamera extends FlxCamera
 				{
 					_scrollTarget.x -= viewWidth;
 				}
-
+				
 				if (targetY >= viewBottom)
 				{
 					_scrollTarget.y += viewHeight;
@@ -119,7 +75,7 @@ class PsychCamera extends FlxCamera
 				{
 					_scrollTarget.x = edge;
 				}
-
+				
 				edge = targetY - deadzone.y;
 				if (_scrollTarget.y > edge)
 				{
@@ -131,7 +87,7 @@ class PsychCamera extends FlxCamera
 					_scrollTarget.y = edge;
 				}
 			}
-
+			
 			if ((target is FlxSprite))
 			{
 				if (_lastTargetPosition == null)
@@ -140,20 +96,18 @@ class PsychCamera extends FlxCamera
 				}
 				_scrollTarget.x += (target.x - _lastTargetPosition.x) * followLead.x;
 				_scrollTarget.y += (target.y - _lastTargetPosition.y) * followLead.y;
-
+				
 				_lastTargetPosition.x = target.x;
 				_lastTargetPosition.y = target.y;
 			}
 		}
+		
+		var lerpVal:Float = 1 - Math.exp(-elapsed * followLerp * 25);
+        if (lerpVal > 1) lerpVal = 1;
+        else if (lerpVal < 0) lerpVal = 0;
 
-		var mult:Float = 1 - Math.exp(-elapsed * followLerp);
-		scroll.x += (_scrollTarget.x - scroll.x) * mult;
-		scroll.y += (_scrollTarget.y - scroll.y) * mult;
-		//trace('lerp on this frame: $mult');
-	}
-
-	override function set_followLerp(value:Float)
-	{
-		return followLerp = value;
+        scroll.x += (_scrollTarget.x - scroll.x) * lerpVal;
+        scroll.y += (_scrollTarget.y - scroll.y) * lerpVal;
+		// trace('lerp on this frame: $mult');
 	}
 }
