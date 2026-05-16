@@ -64,22 +64,6 @@ import psychlua.HScript;
 import tea.SScript;
 #end
 
-/**
- * This is where all the Gameplay stuff happens and is managed
- *
- * here's some useful tips if you are making a mod in source:
- *
- * If you want to add your stage to the game, copy states/stages/Template.hx,
- * and put your stage code there, then, on PlayState, search for
- * "switch (curStage)", and add your stage to that list.
- *
- * If you want to code Events, you can either code it on a Stage file or on PlayState, if you're doing the latter, search for:
- *
- * "function eventPushed" - Only called *one time* when the game loads, use it for precaching events that use the same assets, no matter the values
- * "function eventPushedUnique" - Called one time per event, use it for precaching events that uses different assets based on its values
- * "function eventEarlyTrigger" - Used for making your event start a few MILLISECONDS earlier
- * "function triggerEvent" - Called when the song hits your event's timestamp, this is probably what you were looking for
-**/
 class PlayState extends MusicBeatState
 {
 	public static var STRUM_X = 42;
@@ -200,6 +184,8 @@ class PlayState extends MusicBeatState
 	public var healthBar:Bar;
 	public var timeBar:Bar;
 	var songPercent:Float = 0;
+
+	var curHealth:Float = 1;
 
 	public var ratingsData:Array<Rating> = Rating.loadDefault();
 
@@ -520,8 +506,6 @@ class PlayState extends MusicBeatState
 		timeBar.screenCenter(X);
 		timeBar.alpha = 0;
 		timeBar.visible = showTime;
-		uiGroup.add(timeBar);
-		uiGroup.add(timeTxt);
 
 		strumLineNotes = new FlxTypedGroup<StrumNote>();
 		noteGroup.add(strumLineNotes);
@@ -565,7 +549,7 @@ class PlayState extends MusicBeatState
 		FlxG.worldBounds.set(0, 0, FlxG.width, FlxG.height);
 		moveCameraSection();
 
-		healthBar = new Bar(0, FlxG.height * (!ClientPrefs.data.downScroll ? 0.89 : 0.11), 'healthBar', function() return health, 0, 2);
+		healthBar = new Bar(0, FlxG.height * (!ClientPrefs.data.downScroll ? 0.89 : 0.11), 'healthBar', function() return curHealth, 0, 2);
 		healthBar.screenCenter(X);
 		healthBar.leftToRight = false;
 		healthBar.scrollFactor.set();
@@ -1748,6 +1732,8 @@ class PlayState extends MusicBeatState
 	{
 		CacheManager.update(elapsed);
 
+		curHealth = FlxMath.lerp(curHealth, health, 1 - Math.exp(-elapsed * 9));
+
 		if(!inCutscene && !paused && !freezeCamera) {
 			FlxG.camera.followLerp = 2.4 * cameraSpeed * playbackRate;
 			if(!startingSong && !endingSong && boyfriend.getAnimationName().startsWith('idle')) {
@@ -1810,6 +1796,9 @@ class PlayState extends MusicBeatState
 		{
 			var ret:Dynamic = callOnScripts('onPause', null, true);
 			if(ret != LuaUtils.Function_Stop) {
+				holdNoteCovers.forEachAlive(function(cover:HoldNoteCover) {
+					cover.kill(); 
+				});
 				openPauseMenu();
 			}
 		}
@@ -1826,7 +1815,7 @@ class PlayState extends MusicBeatState
 			health = healthBar.bounds.max;
 
 		updateIconsScale(elapsed);
-		updateIconsPosition();
+		updateIconsPosition(elapsed);
 
 		if (startedCountdown && !paused)
 			Conductor.songPosition += FlxG.elapsed * 1000 * playbackRate;
@@ -1988,20 +1977,24 @@ class PlayState extends MusicBeatState
 	// Health icon updaters
 	public dynamic function updateIconsScale(elapsed:Float)
 	{
-		var mult:Float = FlxMath.lerp(1, iconP1.scale.x, Math.exp(-elapsed * 9 * playbackRate));
+		final rate = HealthIcon.DEFAULT_LERP_RATE * playbackRate;
+
+		var mult:Float = CoolUtil.decayLerp(iconP1.scale.x, 0.9, rate, elapsed);
 		iconP1.scale.set(mult, mult);
 		iconP1.updateHitbox();
 
-		var mult:Float = FlxMath.lerp(1, iconP2.scale.x, Math.exp(-elapsed * 9 * playbackRate));
+		var mult:Float = CoolUtil.decayLerp(iconP2.scale.x, 0.9, rate, elapsed);
 		iconP2.scale.set(mult, mult);
 		iconP2.updateHitbox();
 	}
 
-	public dynamic function updateIconsPosition()
+	public dynamic function updateIconsPosition(elapsed:Float)
 	{
-		var iconOffset:Int = 26;
-		iconP1.x = healthBar.barCenter + (150 * iconP1.scale.x - 150) / 2 - iconOffset;
-		iconP2.x = healthBar.barCenter - (150 * iconP2.scale.x) / 2 - iconOffset * 2;
+		final iconOffset:Int = 26;
+		final rate = HealthIcon.DEFAULT_LERP_RATE * playbackRate;
+			
+		iconP1.x = CoolUtil.decayLerp(iconP1.x, healthBar.barCenter - iconOffset, rate, elapsed);
+		iconP2.x = CoolUtil.decayLerp(iconP2.x, healthBar.barCenter - (190) / 2 - iconOffset, rate, elapsed);
 	}
 
 	var iconsAnimations:Bool = true;
@@ -3210,6 +3203,16 @@ class PlayState extends MusicBeatState
 		if(result != LuaUtils.Function_Stop && result != LuaUtils.Function_StopHScript && result != LuaUtils.Function_StopAll) callOnHScript('goodNoteHit', [note]);
 
 		if(!note.isSustainNote) invalidateNote(note);
+
+		if (note.isSustainNote && ClientPrefs.data.holdNoteCovers) {
+			if (note.animation.curAnim != null && StringTools.endsWith(note.animation.curAnim.name, 'holdend')) {
+				holdNoteCovers.forEachAlive(function(cover:HoldNoteCover) {
+					if (cover.strumId == note.noteData) {
+						cover.playAnim('end');
+					}
+				});
+			}
+		}
 	}
 
 	public function invalidateNote(note:Note):Void {

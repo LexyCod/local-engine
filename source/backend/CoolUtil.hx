@@ -144,6 +144,8 @@ class CoolUtil
 		// #end
 	}
 
+	public static function decayLerp(a:Float, b:Float, decay:Float, elapsed:Float) return b + (a - b) * Math.exp(-decay * elapsed);
+
 	public static function setTextBorderFromString(text:FlxText, border:String)
 	{
 		switch(border.toLowerCase().trim())
