@@ -1409,14 +1409,33 @@ class PlayState extends MusicBeatState
 		{
 			for (songNotes in section.sectionNotes)
 			{
-				var daStrumTime:Float = songNotes[0];
-				var daNoteData:Int = Std.int(songNotes[1] % 4);
-				var gottaHitNote:Bool = section.mustHitSection;
-
-				if (songNotes[1] > 3)
-				{
-					gottaHitNote = !section.mustHitSection;
+				if (!Std.is(songNotes, Array)) {
+					trace('skipping invalid note entry: ' + songNotes);
+					continue;
 				}
+				var noteArr:Array<Dynamic> = songNotes;
+				if (noteArr.length < 3) continue;
+
+				// -- strum time --
+				var rawStrum = noteArr[0];
+				var daStrumTime:Float = Std.parseFloat(Std.string(rawStrum));
+				if (Math.isNaN(daStrumTime)) daStrumTime = 0;
+
+				// -- note data --
+				var rawData = noteArr[1];
+				var noteDataNum:Float = Std.parseFloat(Std.string(rawData));
+				if (Math.isNaN(noteDataNum)) noteDataNum = 0;
+				var daNoteDataInt:Int = Std.int(noteDataNum % 4);
+				var orgNoteData:Int = Std.int(noteDataNum);
+
+				// -- sustain length --
+				var rawSus = noteArr[2];
+				var daSus:Float = Std.parseFloat(Std.string(rawSus));
+				if (Math.isNaN(daSus)) daSus = 0;
+
+				// -- must hit section --
+				var gottaHitNote:Bool = section.mustHitSection;
+				if (orgNoteData > 3) gottaHitNote = !section.mustHitSection;
 
 				var oldNote:Note;
 				if (unspawnNotes.length > 0)
@@ -1424,15 +1443,14 @@ class PlayState extends MusicBeatState
 				else
 					oldNote = null;
 
-				var swagNote:Note = notePool.get(daStrumTime, daNoteData, oldNote);
+				var swagNote:Note = notePool.get(daStrumTime, daNoteDataInt, oldNote);
 				swagNote.mustPress = gottaHitNote;
-				swagNote.sustainLength = songNotes[2];
-				swagNote.gfNote = (section.gfSection && (songNotes[1]<4));
-				swagNote.noteType = songNotes[3];
-				if(!Std.isOfType(songNotes[3], String)) swagNote.noteType = ChartingState.noteTypeList[songNotes[3]]; //Backward compatibility + compatibility with Week 7 charts
+				swagNote.sustainLength = daSus;
+				swagNote.gfNote = (section.gfSection && (orgNoteData < 4));
+				swagNote.noteType = noteArr[3];
+				if(!Std.isOfType(noteArr[3], String)) swagNote.noteType = ChartingState.noteTypeList[noteArr[3]]; //Backward compatibility + compatibility with Week 7 charts
 
 				swagNote.scrollFactor.set();
-
 				unspawnNotes.push(swagNote);
 
 				final susLength:Float = swagNote.sustainLength / Conductor.stepCrochet;
@@ -1443,9 +1461,9 @@ class PlayState extends MusicBeatState
 					{
 						oldNote = unspawnNotes[Std.int(unspawnNotes.length - 1)];
 
-						var sustainNote:Note = notePool.get(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true);
+						var sustainNote:Note = notePool.get(daStrumTime + (Conductor.stepCrochet * susNote), daNoteDataInt, oldNote, true);
 						sustainNote.mustPress = gottaHitNote;
-						sustainNote.gfNote = (section.gfSection && (songNotes[1]<4));
+						sustainNote.gfNote = (section.gfSection && (orgNoteData < 4));
 						sustainNote.noteType = swagNote.noteType;
 						sustainNote.scrollFactor.set();
 						sustainNote.parent = swagNote;
@@ -1475,7 +1493,7 @@ class PlayState extends MusicBeatState
 						else if(ClientPrefs.data.middleScroll)
 						{
 							sustainNote.x += 310;
-							if(daNoteData > 1) //Up and Right
+							if(daNoteDataInt > 1) //Up and Right
 								sustainNote.x += FlxG.width / 2 + 25;
 						}
 					}
@@ -1488,7 +1506,7 @@ class PlayState extends MusicBeatState
 				else if(ClientPrefs.data.middleScroll)
 				{
 					swagNote.x += 310;
-					if(daNoteData > 1) //Up and Right
+					if(daNoteDataInt > 1) //Up and Right
 					{
 						swagNote.x += FlxG.width / 2 + 25;
 					}
@@ -1561,8 +1579,18 @@ class PlayState extends MusicBeatState
 
 	function makeEvent(event:Array<Dynamic>, i:Int)
 	{
+		if (!Std.is(event, Array) || event.length < 2) return;
+
+		var rawTime = event[0];
+		var eventTime:Float = Std.parseFloat(Std.string(rawTime));
+		if (Math.isNaN(eventTime)) eventTime = 0;
+
+		var noteOffsetFloat:Float = Std.parseFloat(Std.string(ClientPrefs.data.noteOffset));
+		if (Math.isNaN(noteOffsetFloat)) noteOffsetFloat = 0;
+		ClientPrefs.data.noteOffset = noteOffsetFloat;
+
 		var subEvent:EventNote = {
-			strumTime: event[0] + ClientPrefs.data.noteOffset,
+			strumTime: eventTime + noteOffsetFloat,
 			event: event[1][i][0],
 			value1: event[1][i][1],
 			value2: event[1][i][2]
@@ -2095,6 +2123,9 @@ class PlayState extends MusicBeatState
 
 	public function checkEventNote() {
 		while(eventNotes.length > 0) {
+			var ev = eventNotes[0];
+			if (ev == null) { eventNotes.shift(); continue; }
+
 			var leStrumTime:Float = eventNotes[0].strumTime;
 			if(Conductor.songPosition < leStrumTime) {
 				return;

@@ -4,6 +4,7 @@ import haxe.Json;
 import lime.utils.Assets;
 
 import backend.Section;
+import Reflect;
 
 typedef SwagSong =
 {
@@ -70,14 +71,24 @@ class Song
 				var len:Int = notes.length;
 				while(i < len)
 				{
-					var note:Array<Dynamic> = notes[i];
-					if(note[1] < 0)
-					{
-						songJson.events.push([note[0], [[note[2], note[3], note[4]]]]);
+					var note = notes[i];
+					if (Std.is(note, Array)) {
+						var noteArr:Array<Dynamic> = note;
+						if (noteArr[1] < 0) {
+							var eventName = (noteArr[2] != null) ? noteArr[2] : '';
+							var val1 = (noteArr[3] != null) ? noteArr[3] : '';
+							var val2 = (noteArr[4] != null) ? noteArr[4] : '';
+							songJson.events.push([noteArr[0], [[eventName, val1, val2]]]);
+							notes.remove(note);
+							len = notes.length;
+						}
+						else i++;
+					}
+					else {
+						//invalid note
 						notes.remove(note);
 						len = notes.length;
 					}
-					else i++;
 				}
 			}
 		}
@@ -134,6 +145,8 @@ class Song
 				daBpm = songData.bpm; */
 
 		var songJson:Dynamic = parseJSONshit(rawJson);
+		if (songJson == null || !Std.is(songJson.notes, Array)) throw 'Invalid song json: missing notes array';
+		if (songJson.events == null) songJson.events = [];
 		if(jsonInput != 'events') StageData.loadDirectory(songJson);
 		onLoadJson(songJson);
 		return songJson;
@@ -141,6 +154,8 @@ class Song
 
 	public static function parseJSONshit(rawJson:String):SwagSong
 	{
-		return cast Json.parse(rawJson).song;
+		var parsed = Json.parse(rawJson);
+		if (parsed == null || !Reflect.hasField(parsed, 'song')) throw 'invalid json: missing "song" field';
+		return cast parsed.song;
 	}
 }
