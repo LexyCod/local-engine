@@ -29,6 +29,12 @@ typedef SwagSong =
 
 	@:optional var arrowSkin:String;
 	@:optional var splashSkin:String;
+
+	// Psych Engine 1.0+ fields
+	@:optional var chartVersion:String;
+	@:optional var offsets:Array<Float>;      // [inst, voices] offsets in ms
+	@:optional var ratings:Dynamic;           // difficulty ratings map
+	@:optional var mania:Int;                 // 0 = 4-key (default)
 }
 
 class Song
@@ -51,15 +57,86 @@ class Song
 	public var player2:String = 'dad';
 	public var gfVersion:String = 'gf';
 
-	private static function onLoadJson(songJson:Dynamic) // Convert old charts to newest format
+	private static function onLoadJson(songJson:Dynamic)
 	{
-		if(songJson.gfVersion == null)
+		if (songJson.gfVersion == null)
 		{
 			songJson.gfVersion = songJson.player3;
 			songJson.player3 = null;
 		}
 
-		if(songJson.events == null)
+		var chartVer:String = (songJson.chartVersion != null) ? songJson.chartVersion : '';
+		var is10Chart:Bool = _chartVersionAtLeast(chartVer, 1, 0, 0);
+
+		if (is10Chart)
+		{
+			// 1.0 charts already have a proper events array — nothing extra needed.
+			if (songJson.events == null) songJson.events = [];
+
+			for (secNum in 0...songJson.notes.length)
+			{
+				var sec:Dynamic = songJson.notes[secNum];
+				if (sec == null || sec.sectionNotes == null) continue;
+
+				var notes:Array<Dynamic> = sec.sectionNotes;
+				var i:Int = 0;
+				var len:Int = notes.length;
+
+
+				if (sec.mustHitSection == null)
+				{
+					var playerCount:Int = 0;
+					var oppCount:Int = 0;
+					for (n in notes)
+					{
+						if (Std.is(n, Array))
+						{
+							var nd:Int = Std.int(n[1]);
+							if (nd >= 4) playerCount++ else oppCount++;
+						}
+					}
+					sec.mustHitSection = (playerCount >= oppCount);
+				}
+
+				while (i < len)
+				{
+					var note:Dynamic = notes[i];
+					if (Std.is(note, Array))
+					{
+						var noteArr:Array<Dynamic> = note;
+						var nd:Int = Std.int(noteArr[1]);
+						if (nd < 0)
+						{
+							var eventName:String = (noteArr[2] != null) ? noteArr[2] : '';
+							var val1:String     = (noteArr[3] != null) ? noteArr[3] : '';
+							var val2:String     = (noteArr[4] != null) ? noteArr[4] : '';
+							songJson.events.push([noteArr[0], [[eventName, val1, val2]]]);
+							notes.remove(note);
+							len = notes.length;
+						}
+						else
+						{
+							if (sec.mustHitSection)
+							{
+								if (nd >= 4)
+									noteArr[1] = nd - 4
+								else
+									noteArr[1] = nd + 4;
+							}
+							i++;
+						}
+					}
+					else
+					{
+						notes.remove(note);
+						len = notes.length;
+					}
+				}
+			}
+			return;
+		}
+
+		if (songJson.events == null)
 		{
 			songJson.events = [];
 			for (secNum in 0...songJson.notes.length)
@@ -69,29 +146,46 @@ class Song
 				var i:Int = 0;
 				var notes:Array<Dynamic> = sec.sectionNotes;
 				var len:Int = notes.length;
-				while(i < len)
+				while (i < len)
 				{
 					var note = notes[i];
-					if (Std.is(note, Array)) {
+					if (Std.is(note, Array))
+					{
 						var noteArr:Array<Dynamic> = note;
-						if (noteArr[1] < 0) {
+						if (noteArr[1] < 0)
+						{
 							var eventName = (noteArr[2] != null) ? noteArr[2] : '';
-							var val1 = (noteArr[3] != null) ? noteArr[3] : '';
-							var val2 = (noteArr[4] != null) ? noteArr[4] : '';
+							var val1      = (noteArr[3] != null) ? noteArr[3] : '';
+							var val2      = (noteArr[4] != null) ? noteArr[4] : '';
 							songJson.events.push([noteArr[0], [[eventName, val1, val2]]]);
 							notes.remove(note);
 							len = notes.length;
 						}
 						else i++;
 					}
-					else {
-						//invalid note
+					else
+					{
 						notes.remove(note);
 						len = notes.length;
 					}
 				}
 			}
 		}
+	}
+
+	private static function _chartVersionAtLeast(ver:String, major:Int, minor:Int, patch:Int):Bool
+	{
+		if (ver == null || ver.length == 0) return false;
+		var parts = ver.split('.');
+		var _pMaj:Null<Int> = (parts.length > 0) ? Std.parseInt(parts[0]) : null;
+		var _pMin:Null<Int> = (parts.length > 1) ? Std.parseInt(parts[1]) : null;
+		var _pPat:Null<Int> = (parts.length > 2) ? Std.parseInt(parts[2]) : null;
+		var vMaj:Int = (_pMaj != null) ? _pMaj : 0;
+		var vMin:Int = (_pMin != null) ? _pMin : 0;
+		var vPat:Int = (_pPat != null) ? _pPat : 0;
+		if (vMaj != major) return vMaj > major;
+		if (vMin != minor) return vMin > minor;
+		return vPat >= patch;
 	}
 
 	public function new(song, notes, bpm)
@@ -155,7 +249,22 @@ class Song
 	public static function parseJSONshit(rawJson:String):SwagSong
 	{
 		var parsed = Json.parse(rawJson);
-		if (parsed == null || !Reflect.hasField(parsed, 'song')) throw 'invalid json: missing "song" field';
-		return cast parsed.song;
+		if (parsed == null) throw 'invalid json: null result';
+
+		var songField = Reflect.field(parsed, 'song');
+		if (songField != null && Std.isOfType(songField, String))
+		{
+			if (Reflect.hasField(parsed, 'notes'))
+				return cast parsed;
+			throw 'invalid json: missing "notes" field';
+		}
+
+		if (songField != null && Reflect.hasField(songField, 'notes'))
+			return cast songField;
+
+		if (Reflect.hasField(parsed, 'notes'))
+			return cast parsed;
+
+		throw 'invalid json: missing "song" or "notes" field';
 	}
 }

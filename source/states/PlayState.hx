@@ -1120,7 +1120,10 @@ class PlayState extends MusicBeatState
 
 	inline private function createCountdownSprite(image:String, antialias:Bool):FlxSprite
 	{
-		var spr:FlxSprite = new FlxSprite().loadGraphic(Paths.image(image));
+		var graphic = Paths.image(image);
+		if (graphic == null) graphic = Paths.image(image.split('/').pop()); // strip stageUI prefix, try default
+		var spr:FlxSprite = new FlxSprite();
+		if (graphic != null) spr.loadGraphic(graphic);
 		spr.cameras = [camHUD];
 		spr.scrollFactor.set();
 		spr.updateHitbox();
@@ -1571,7 +1574,7 @@ class PlayState extends MusicBeatState
 
 		var noteOffsetFloat:Float = Std.parseFloat(Std.string(ClientPrefs.data.noteOffset));
 		if (Math.isNaN(noteOffsetFloat)) noteOffsetFloat = 0;
-		ClientPrefs.data.noteOffset = noteOffsetFloat;
+		ClientPrefs.data.noteOffset = Std.int(noteOffsetFloat);
 
 		var subEvent:EventNote = {
 			strumTime: eventTime + noteOffsetFloat,
@@ -2660,7 +2663,7 @@ class PlayState extends MusicBeatState
 			antialias = !isPixelStage;
 		}
 
-		rating.loadGraphic(Paths.image(uiPrefix + daRating.image + uiSuffix));
+		rating.loadGraphic(Paths.image(uiPrefix + daRating.image + uiSuffix) ?? Paths.image(daRating.image));
 		rating.screenCenter();
 		rating.x = placement - 40;
 		rating.y -= 60;
@@ -2672,7 +2675,7 @@ class PlayState extends MusicBeatState
 		rating.y -= ClientPrefs.data.comboOffset[1];
 		rating.antialiasing = antialias;
 
-		var comboSpr:FlxSprite = new FlxSprite().loadGraphic(Paths.image(uiPrefix + 'combo' + uiSuffix));
+		var comboSpr:FlxSprite = new FlxSprite().loadGraphic(Paths.image(uiPrefix + 'combo' + uiSuffix) ?? Paths.image('combo'));
 		comboSpr.screenCenter();
 		comboSpr.x = placement;
 		comboSpr.acceleration.y = FlxG.random.int(200, 300) * playbackRate * playbackRate;
@@ -2715,7 +2718,7 @@ class PlayState extends MusicBeatState
 
 		for (i in seperatedScore)
 		{
-			var numScore:FlxSprite = new FlxSprite().loadGraphic(Paths.image(uiPrefix + 'num' + Std.int(i) + uiSuffix));
+			var numScore:FlxSprite = new FlxSprite().loadGraphic(Paths.image(uiPrefix + 'num' + Std.int(i) + uiSuffix) ?? Paths.image('num' + Std.int(i)));
 			numScore.screenCenter();
 			numScore.x = placement + (43 * daLoop) - 90 + ClientPrefs.data.comboOffset[2];
 			numScore.y += 80 - ClientPrefs.data.comboOffset[3];
@@ -3308,8 +3311,8 @@ class PlayState extends MusicBeatState
 		if (generatedMusic)
 			notes.sort(FlxSort.byY, ClientPrefs.data.downScroll ? FlxSort.ASCENDING : FlxSort.DESCENDING);
 
-		iconP1.scale.set(1.2, 1.2);
-		iconP2.scale.set(1.2, 1.2);
+		iconP1.scale.set(1.1, 1.1);
+		iconP2.scale.set(1.1, 1.1);
 
 		iconP1.updateHitbox();
 		iconP2.updateHitbox();

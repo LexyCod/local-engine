@@ -68,10 +68,12 @@ class StrumNote extends FlxSprite
 
 		if(PlayState.isPixelStage)
 		{
-			loadGraphic(Paths.image('pixelUI/' + texture));
+			var graphic = Paths.image('pixelUI/' + texture);
+			if (graphic == null) return;
+			loadGraphic(graphic);
 			width = width / 4;
 			height = height / 5;
-			loadGraphic(Paths.image('pixelUI/' + texture), true, Math.floor(width), Math.floor(height));
+			loadGraphic(graphic, true, Math.floor(width), Math.floor(height));
 
 			antialiasing = false;
 			setGraphicSize(Std.int(width * PlayState.daPixelZoom));
@@ -102,7 +104,11 @@ class StrumNote extends FlxSprite
 		}
 		else
 		{
-			frames = Paths.getSparrowAtlas(texture);
+			var atlas = Paths.getSparrowAtlas(texture);
+			if (atlas == null) atlas = Paths.getSparrowAtlas(Note.defaultNoteSkin);
+			if (atlas == null) return; // still null — assets broken, bail out safely
+			frames = atlas;
+
 			animation.addByPrefix('green', 'arrowUP');
 			animation.addByPrefix('blue', 'arrowDOWN');
 			animation.addByPrefix('purple', 'arrowLEFT');
@@ -166,5 +172,10 @@ class StrumNote extends FlxSprite
 			centerOrigin();
 		}
 		if(useRGBShader) rgbShader.enabled = (animation.curAnim != null && animation.curAnim.name != 'static');
+	}
+
+	override function draw() {
+		if (frames == null || animation.curAnim == null) return;
+		super.draw();
 	}
 }

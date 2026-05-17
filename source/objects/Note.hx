@@ -324,8 +324,8 @@ class Note extends FlxSprite
 		this.noteData = noteData;
 
 		if(noteData > -1) {
-			reloadNote(texture);
-			texture = '';
+			@:bypassAccessor texture = ''; // reset first so reloadNote always runs fresh
+			reloadNote('');
 
 			rgbShader = new RGBShaderReference(this, initializeGlobalRGBShader(noteData));
 			if (PlayState.SONG != null && PlayState.SONG.disableNoteRGB) rgbShader.enabled = false;
@@ -708,7 +708,7 @@ class Note extends FlxSprite
 	{
 		clipRect = rect;
 
-		if (frames != null)
+		if (frames != null && animation != null && animation.frameIndex >= 0 && animation.frameIndex < frames.frames.length)
 			frame = frames.frames[animation.frameIndex];
 
 		return rect;
