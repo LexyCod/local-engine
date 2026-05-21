@@ -9,7 +9,7 @@ import debug.FPSCounter;
 import flixel.graphics.FlxGraphic;
 import flixel.FlxGame;
 import flixel.FlxState;
-import flixel.system.scaleModes.RatioScaleMode;
+import flixel.system.scaleModes.StageSizeScaleMode;
 import haxe.io.Path;
 import openfl.Assets;
 import openfl.Lib;
@@ -94,14 +94,18 @@ class Main extends Sprite
 		var stageWidth:Int  = Lib.current.stage.stageWidth;
 		var stageHeight:Int = Lib.current.stage.stageHeight;
 
+		#if (flixel < "5.0.0")
 		if (game.zoom == -1.0)
 		{
 			var ratioX:Float = stageWidth  / game.width;
 			var ratioY:Float = stageHeight / game.height;
-			game.zoom   = Math.max(ratioX, ratioY);
+			game.zoom   = Math.min(ratioX, ratioY);
 			game.width  = Math.ceil(stageWidth  / game.zoom);
 			game.height = Math.ceil(stageHeight / game.zoom);
 		}
+		#else
+		game.zoom = 1;
+		#end
 
 
 		#if LUA_ALLOWED Lua.set_callbacks_function(cpp.Callable.fromStaticFunction(psychlua.CallbackHandler.call)); #end
@@ -112,7 +116,7 @@ class Main extends Sprite
 
 		addChild(new FlxGame(game.width, game.height, game.initialState, #if (flixel < "5.0.0") game.zoom, #end game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 		
-		FlxG.scaleMode = new RatioScaleMode(false);
+		FlxG.scaleMode = new StageSizeScaleMode();
 
 		#if !mobile
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);

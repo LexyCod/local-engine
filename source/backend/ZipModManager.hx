@@ -74,7 +74,7 @@ class ZipModManager
 	{
 		#if (sys && MODS_ALLOWED)
 		var found:Dynamic = findModEntry(mod, key);
-		return found != null ? found.entry.data : null;
+		return found != null ? entryBytes(found.entry) : null;
 		#else
 		return null;
 		#end
@@ -97,7 +97,7 @@ class ZipModManager
 			id: 'zip://mod/$mod/$path',
 			path: path,
 			source: found.cache.filePath,
-			bytes: found.entry.data,
+			bytes: entryBytes(found.entry),
 			mod: mod
 		};
 		#else
@@ -119,7 +119,7 @@ class ZipModManager
 
 		for (entryPath in cache.entries.keys())
 		{
-			var path:String = stripRootPrefix(cache, entryPath);
+			var path:String = logicalModPath(cache, mod, entryPath);
 			if (path.length < 1 || path.endsWith('/')) continue;
 			if (folder.length > 0 && !path.startsWith(folder)) continue;
 			if (extension.length > 0 && !path.toLowerCase().endsWith(extension)) continue;
@@ -142,7 +142,7 @@ class ZipModManager
 	{
 		#if sys
 		var found:Dynamic = findAssetEntry(path);
-		return found != null ? found.entry.data : null;
+		return found != null ? entryBytes(found.entry) : null;
 		#else
 		return null;
 		#end
@@ -179,7 +179,7 @@ class ZipModManager
 			{
 				if (Path.withoutDirectory(cache.filePath) != zipName) continue;
 				var found:Dynamic = findEntry(cache, [key]);
-				if (found != null) return found.entry.data;
+				if (found != null) return entryBytes(found.entry);
 			}
 		}
 		#end
@@ -296,7 +296,6 @@ class ZipModManager
 				var path:String = normalizeEntryPath(entry.fileName);
 				if (path.length < 1 || path.endsWith('/') || isJunkEntry(path)) continue;
 
-				Reader.unzip(entry);
 				entries.set(path, entry);
 			}
 
@@ -342,7 +341,7 @@ class ZipModManager
 		var cache:ZipCache = modCaches.get(mod);
 		if (cache == null) return null;
 
-		return findEntry(cache, modLookupKeys(key));
+		return findEntry(cache, modLookupKeys(mod, key));
 	}
 
 	static function findAssetEntry(path:String):Dynamic
@@ -374,13 +373,45 @@ class ZipModManager
 		return null;
 	}
 
-	static function modLookupKeys(path:String):Array<String>
+	static function entryBytes(entry:Entry):Bytes
+	{
+		if (entry == null) return null;
+		try
+		{
+			return Reader.unzip(entry);
+		}
+		catch (e:Dynamic)
+		{
+			#if (debug || dev) trace('[ZipModManager] Could not unzip "${entry.fileName}": $e'); #end
+			return null;
+		}
+	}
+
+	static function modLookupKeys(mod:String, path:String):Array<String>
 	{
 		var keys:Array<String> = [];
-		addLookupKey(keys, normalizeLookupPath(path));
+		var base:String = normalizeLookupPath(path);
+		var variants:Array<String> = [];
+		addLookupKey(variants, base);
 
-		var key:String = keys.length > 0 ? keys[0] : '';
-		if (key.startsWith('assets/')) addLookupKey(keys, key.substr(7));
+		if (base.startsWith('assets/'))
+			addLookupKey(variants, base.substr(7));
+
+		var snapshot:Array<String> = variants.copy();
+		for (variant in snapshot)
+		{
+			addLookupKey(variants, 'assets/$variant');
+			if (!variant.startsWith('songs/') && !variant.startsWith('music/') && !variant.startsWith('videos/'))
+				addLookupKey(variants, 'assets/shared/$variant');
+		}
+
+		for (variant in variants)
+		{
+			addLookupKey(keys, variant);
+			addLookupKey(keys, '$mod/$variant');
+			for (root in modRootPaths())
+				addLookupKey(keys, '$root/$mod/$variant');
+		}
 		return keys;
 	}
 
@@ -421,6 +452,32 @@ class ZipModManager
 	static function stripRootPrefix(cache:ZipCache, path:String):String
 	{
 		return cache.rootPrefix.length > 0 && path.startsWith(cache.rootPrefix) ? path.substr(cache.rootPrefix.length) : path;
+	}
+
+	static function logicalModPath(cache:ZipCache, mod:String, path:String):String
+	{
+		path = stripRootPrefix(cache, path);
+
+		for (root in modRootPaths())
+		{
+			var rooted:String = '$root/$mod/';
+			if (path.startsWith(rooted))
+			{
+				path = path.substr(rooted.length);
+				break;
+			}
+		}
+
+		var modPrefix:String = '$mod/';
+		if (path.startsWith(modPrefix))
+			path = path.substr(modPrefix.length);
+
+		if (path.startsWith('assets/shared/'))
+			path = path.substr('assets/shared/'.length);
+		else if (path.startsWith('assets/'))
+			path = path.substr('assets/'.length);
+
+		return path;
 	}
 
 	static function normalizeEntryPath(path:String):String

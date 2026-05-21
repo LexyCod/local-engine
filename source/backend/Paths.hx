@@ -672,6 +672,12 @@ class Paths
 			if (global != null) return global;
 		}
 
+		for(mod in Mods.getModDirectories())
+		{
+			if (mod == Mods.currentModDirectory || Mods.getGlobalMods().contains(mod)) continue;
+			var discovered = findAssetInMod(mod, strippedKey);
+			if (discovered != null) return discovered;
+		}
 
 		var looseFile = findLooseModFile(strippedKey);
 		if (looseFile != null)

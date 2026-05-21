@@ -202,7 +202,20 @@ class Song
 		if(folder == null) folder = jsonInput;
 		var formattedFolder:String = Paths.formatToSongPath(folder);
 		var formattedSong:String = Paths.formatToSongPath(jsonInput);
-		rawJson = Paths.getTextFromFile('data/$formattedFolder/$formattedSong.json');
+		var difficultyName:String = formattedSong;
+		if (difficultyName.startsWith(formattedFolder + '-'))
+			difficultyName = difficultyName.substr(formattedFolder.length + 1);
+		if (difficultyName == formattedFolder || difficultyName.length < 1)
+			difficultyName = 'normal';
+
+		rawJson = firstText([
+			'data/$formattedFolder/$formattedSong.json',
+			'data/$formattedFolder/charts/$difficultyName.json',
+			'data/$formattedFolder/charts/$formattedSong.json',
+			'songs/$formattedFolder/charts/$difficultyName.json',
+			'songs/$formattedFolder/charts/$formattedSong.json',
+			'songs/$formattedFolder/$formattedSong.json'
+		]);
 
 		if(rawJson == null) {
 			var path:String = Paths.json(formattedFolder + '/' + formattedSong);
@@ -238,7 +251,18 @@ class Song
 				daSong = songData.song;
 				daBpm = songData.bpm; */
 
-		var songJson:Dynamic = parseJSONshit(rawJson);
+		var metaRaw:String = firstText([
+			'songs/$formattedFolder/meta.json',
+			'data/$formattedFolder/meta.json',
+			'data/$formattedFolder/$formattedFolder-metadata.json'
+		]);
+		var meta:Dynamic = null;
+		if (metaRaw != null)
+		{
+			try meta = Json.parse(metaRaw) catch(e:Dynamic) meta = null;
+		}
+
+		var songJson:Dynamic = parseJSONshit(rawJson, formattedFolder, meta);
 		if (songJson == null || !Std.is(songJson.notes, Array)) throw 'Invalid song json: missing notes array';
 		if (songJson.events == null) songJson.events = [];
 		if(jsonInput != 'events') StageData.loadDirectory(songJson);
@@ -246,10 +270,24 @@ class Song
 		return songJson;
 	}
 
-	public static function parseJSONshit(rawJson:String):SwagSong
+	static function firstText(paths:Array<String>):String
+	{
+		for (path in paths)
+		{
+			var raw:String = Paths.getTextFromFile(path);
+			if (raw != null && raw.trim().length > 0)
+				return raw.trim();
+		}
+		return null;
+	}
+
+	public static function parseJSONshit(rawJson:String, ?fallbackSong:String = 'song', ?meta:Dynamic = null):SwagSong
 	{
 		var parsed = Json.parse(rawJson);
 		if (parsed == null) throw 'invalid json: null result';
+
+		if (Reflect.hasField(parsed, 'strumLines'))
+			return cast convertCodenameChart(parsed, fallbackSong, meta);
 
 		var songField = Reflect.field(parsed, 'song');
 		if (songField != null && Std.isOfType(songField, String))
@@ -266,5 +304,143 @@ class Song
 			return cast parsed;
 
 		throw 'invalid json: missing "song" or "notes" field';
+	}
+
+	static function convertCodenameChart(chart:Dynamic, fallbackSong:String, ?meta:Dynamic):Dynamic
+	{
+		var bpm:Float = numField(chart, ['bpm'], numField(meta, ['bpm'], 100));
+		var speed:Float = numField(chart, ['scrollSpeed', 'speed'], numField(meta, ['scrollSpeed', 'speed'], 1));
+		var songName:String = strField(meta, ['name', 'song', 'displayName'], strField(chart, ['song', 'name'], fallbackSong));
+		var player1:String = strField(meta, ['player', 'player1', 'bf'], 'bf');
+		var player2:String = strField(meta, ['opponent', 'player2', 'dad'], 'dad');
+		var gfVersion:String = strField(meta, ['girlfriend', 'gf', 'player3'], 'gf');
+		var stage:String = strField(meta, ['stage'], strField(chart, ['stage'], null));
+
+		var sectionLength:Float = (60 / Math.max(1, bpm)) * 4 * 1000;
+		var sections:Array<Dynamic> = [];
+		var events:Array<Dynamic> = [];
+		var maxTime:Float = 0;
+
+		var strumLines:Dynamic = Reflect.field(chart, 'strumLines');
+		if (Std.isOfType(strumLines, Array))
+		{
+			var lines:Array<Dynamic> = cast strumLines;
+			for (lineIndex in 0...lines.length)
+			{
+				var line:Dynamic = lines[lineIndex];
+				var mustPress:Bool = codenameLineIsPlayer(line, lineIndex, lines.length);
+				var lineNotes:Dynamic = Reflect.field(line, 'notes');
+				if (!Std.isOfType(lineNotes, Array)) continue;
+
+				for (note in cast(lineNotes, Array<Dynamic>))
+				{
+					var time:Float = numField(note, ['time', 'strumTime', 't'], 0);
+					var data:Int = Std.int(numField(note, ['id', 'data', 'noteData', 'direction'], 0)) % 4;
+					if (data < 0) data += 4;
+					var sustain:Float = numField(note, ['length', 'sLen', 'sustainLength', 'duration'], 0);
+					var type:String = strField(note, ['type', 'noteType'], '');
+					var psychData:Int = data + (mustPress ? 0 : 4);
+					var noteEntry:Array<Dynamic> = [time, psychData, sustain, type];
+					getSection(sections, Std.int(Math.floor(time / sectionLength)), bpm).sectionNotes.push(noteEntry);
+					maxTime = Math.max(maxTime, time + sustain);
+				}
+			}
+		}
+
+		var rawEvents:Dynamic = Reflect.field(chart, 'events');
+		if (Std.isOfType(rawEvents, Array))
+		{
+			for (event in cast(rawEvents, Array<Dynamic>))
+			{
+				var time:Float = numField(event, ['time', 'strumTime', 't'], 0);
+				var name:String = strField(event, ['name', 'event', 'type'], '');
+				var params:Dynamic = Reflect.field(event, 'params');
+				var v1:String = '';
+				var v2:String = '';
+				if (Std.isOfType(params, Array))
+				{
+					var arr:Array<Dynamic> = cast params;
+					if (arr.length > 0) v1 = Std.string(arr[0]);
+					if (arr.length > 1) v2 = Std.string(arr[1]);
+				}
+				else
+				{
+					v1 = strField(event, ['value1', 'val1'], '');
+					v2 = strField(event, ['value2', 'val2'], '');
+				}
+				events.push([time, [[name, v1, v2]]]);
+				maxTime = Math.max(maxTime, time);
+			}
+		}
+
+		if (sections.length < 1)
+			getSection(sections, 0, bpm);
+
+		return {
+			song: songName,
+			notes: sections,
+			events: events,
+			bpm: bpm,
+			needsVoices: true,
+			speed: speed,
+			player1: player1,
+			player2: player2,
+			gfVersion: gfVersion,
+			stage: stage,
+			chartVersion: 'codename'
+		};
+	}
+
+	static function getSection(sections:Array<Dynamic>, index:Int, bpm:Float):Dynamic
+	{
+		while (sections.length <= index)
+		{
+			sections.push({
+				sectionNotes: [],
+				sectionBeats: 4,
+				mustHitSection: true,
+				gfSection: false,
+				bpm: bpm,
+				changeBPM: false,
+				altAnim: false
+			});
+		}
+		return sections[index];
+	}
+
+	static function codenameLineIsPlayer(line:Dynamic, lineIndex:Int, lineCount:Int):Bool
+	{
+		var explicit:Dynamic = Reflect.field(line, 'mustPress');
+		if (explicit == null) explicit = Reflect.field(line, 'player');
+		if (Std.isOfType(explicit, Bool)) return explicit;
+
+		var pos:String = strField(line, ['position', 'type', 'character'], '').toLowerCase();
+		if (pos == 'boyfriend' || pos == 'bf' || pos == 'player' || pos == 'right') return true;
+		if (pos == 'dad' || pos == 'opponent' || pos == 'left') return false;
+		return lineCount == 1 || lineIndex > 0;
+	}
+
+	static function numField(obj:Dynamic, names:Array<String>, fallback:Float):Float
+	{
+		if (obj == null) return fallback;
+		for (name in names)
+		{
+			var value:Dynamic = Reflect.field(obj, name);
+			if (value == null) continue;
+			var num:Float = Std.parseFloat(Std.string(value));
+			if (!Math.isNaN(num)) return num;
+		}
+		return fallback;
+	}
+
+	static function strField(obj:Dynamic, names:Array<String>, fallback:String):String
+	{
+		if (obj == null) return fallback;
+		for (name in names)
+		{
+			var value:Dynamic = Reflect.field(obj, name);
+			if (value != null) return Std.string(value);
+		}
+		return fallback;
 	}
 }

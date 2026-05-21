@@ -22,6 +22,7 @@ import states.OutdatedState;
 import states.MainMenuState;
 
 import backend.LocalEngineVersion;
+import backend.StartupStateResolver;
 
 typedef TitleData =
 {
@@ -82,6 +83,15 @@ class TitleState extends MusicBeatState
 		FlxG.save.bind('funkin', CoolUtil.getSavePath());
 
 		ClientPrefs.loadPrefs();
+
+		var configuredStartupState = StartupStateResolver.takeStartupState();
+		if (configuredStartupState != null)
+		{
+			FlxTransitionableState.skipNextTransIn = true;
+			FlxTransitionableState.skipNextTransOut = true;
+			MusicBeatState.switchState(configuredStartupState);
+			return;
+		}
 
 		#if CHECK_FOR_UPDATES
 		if(ClientPrefs.data.checkForUpdates && !closedState) {

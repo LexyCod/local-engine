@@ -87,6 +87,16 @@ sit back, relax, wait for haxelib to do its magic, and once everything is done, 
 
 where `<platform>` gets replaced with `windows`, `linux`, or `mac`
 
+For a small Windows release folder, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/package-windows.ps1 -Configuration release
+```
+
+More info about zip mods, packed assets, chart compatibility, and packaging is in
+[`MODDING_AND_PACKAGING.md`](./MODDING_AND_PACKAGING.md).
+Startup state can also be configured from `engine.json` or `startup.json`; see the same doc.
+
 ---
 
 ### "It's taking a while, should I be worried?"

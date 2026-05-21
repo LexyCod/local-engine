@@ -16,6 +16,7 @@ import openfl.events.IOErrorEvent;
 import openfl.utils.Assets;
 import lime.system.Clipboard;
 
+import backend.ZipModManager;
 import objects.Character;
 import objects.HealthIcon;
 import objects.Bar;
@@ -453,7 +454,7 @@ class CharacterEditorState extends MusicBeatState
 			var characterPath:String = 'characters/$intended.json';
 			var path:String = Paths.getPath(characterPath, TEXT, null, true);
 			#if MODS_ALLOWED
-			if (FileSystem.exists(path))
+			if (Paths.fileExists(characterPath, TEXT) || FileSystem.exists(path))
 			#else
 			if (Assets.exists(path))
 			#end
@@ -1200,6 +1201,8 @@ class CharacterEditorState extends MusicBeatState
 		characterList = Mods.mergeAllTextsNamed('data/characterList.txt', Paths.getSharedPath());
 		var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getSharedPath(), 'characters/');
 		for (folder in foldersToCheck)
+		{
+			if (!FileSystem.exists(folder) || !FileSystem.isDirectory(folder)) continue;
 			for (file in FileSystem.readDirectory(folder))
 				if(file.toLowerCase().endsWith('.json'))
 				{
@@ -1207,6 +1210,19 @@ class CharacterEditorState extends MusicBeatState
 					if(!characterList.contains(charToCheck))
 						characterList.push(charToCheck);
 				}
+		}
+
+		#if MODS_ALLOWED
+		for (mod in Mods.parseList().enabled)
+			for (zipPath in ZipModManager.listModFiles(mod, 'characters/', '.json'))
+			{
+				var file:String = zipPath.substr('characters/'.length);
+				if (file.indexOf('/') >= 0) continue;
+				var charToCheck:String = file.substr(0, file.length - 5);
+				if(!characterList.contains(charToCheck))
+					characterList.push(charToCheck);
+			}
+		#end
 
 		if(characterList.length < 1) characterList.push('');
 		charDropDown.setData(FlxUIDropDownMenu.makeStrIdLabelArray(characterList, true));
