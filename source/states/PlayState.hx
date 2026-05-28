@@ -270,6 +270,8 @@ class PlayState extends MusicBeatState
 	public var startCallback:Void->Void = null;
 	public var endCallback:Void->Void = null;
 
+	private var lastCamSection:Int = -1;
+
 	override public function create()
 	{
 		//trace('Playback Rate: ' + playbackRate);
@@ -1510,6 +1512,7 @@ class PlayState extends MusicBeatState
 
 		unspawnNotes.sort(sortByTime);
 		generatedMusic = true;
+		lastCamSection = -1;
 	}
 
 	// called only once per different event (Used for precaching)
@@ -1945,6 +1948,14 @@ class PlayState extends MusicBeatState
 				}
 			}
 			checkEventNote();
+		}
+
+		if (!inCutscene && !paused && generatedMusic && !endingSong && !isCameraOnForcedPos) {
+			var curSec:Int = curSection;
+			if (curSec != lastCamSection && SONG.notes[curSec] != null) {
+				lastCamSection = curSec;
+				moveCameraSection();
+			}
 		}
 
 		#if (debug || dev)
