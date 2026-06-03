@@ -19,6 +19,8 @@ import openfl.display.StageScaleMode;
 import lime.app.Application;
 import states.TitleState;
 
+import objects.FunkinSoundTray;
+
 #if linux
 import lime.graphics.Image;
 #end
@@ -115,6 +117,13 @@ class Main extends Sprite
 		#if ACHIEVEMENTS_ALLOWED Achievements.load(); #end
 
 		addChild(new FlxGame(game.width, game.height, game.initialState, #if (flixel < "5.0.0") game.zoom, #end game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
+
+		@:privateAccess
+		{
+			var tray = new FunkinSoundTray();
+			FlxG.game.soundTray = tray;
+			FlxG.game.addChild(tray);
+		}
 
 		#if !mobile
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);

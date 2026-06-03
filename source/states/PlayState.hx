@@ -1972,16 +1972,6 @@ class PlayState extends MusicBeatState
 				setSongTime(Conductor.songPosition + 10000);
 				clearNotesBefore(Conductor.songPosition);
 			}
-			if(FlxG.keys.justPressed.F3)
-			{
-				trace('=== LOCAL ENGINE DEBUG ===');
-				trace(LocalEngineVersion.FULL_STRING);
-				trace(notePool.getStats());
-				trace(AsyncSongLoader.getStats());
-				trace('Song progress: ' + Math.round(songPercent * 100) + '%');
-				trace('Memory: ' + Math.round(openfl.system.System.totalMemory / 1024 / 1024) + 'MB');
-				trace('=========================');
-			}
 			if(FlxG.keys.justPressed.F4) trace(CacheManager.getStats());
 		}
 		#end
