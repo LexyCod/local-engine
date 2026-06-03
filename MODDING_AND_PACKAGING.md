@@ -7,31 +7,31 @@ Drop zip mods into `content/` or `mods/` next to `LocalEngine.exe`.
 Supported layouts:
 
 ```text
-content/bradarPack.zip
+content/Mod.zip
   characters/bf.json
   images/characters/BOYFRIEND.png
   songs/tutorial/Inst.ogg
 ```
 
 ```text
-content/bradarPack.zip
-  bradarPack/
+content/Mod.zip
+  Mod/
     characters/bf.json
     images/characters/BOYFRIEND.png
     songs/tutorial/Inst.ogg
 ```
 
 ```text
-content/bradarPack.zip
+content/Mod.zip
   assets/shared/characters/bf.json
   assets/shared/images/characters/BOYFRIEND.png
   assets/songs/tutorial/Inst.ogg
 ```
 
 ```text
-content/bradarPack.zip
-  content/bradarPack/characters/bf.json
-  content/bradarPack/songs/tutorial/Inst.ogg
+content/Mod.zip
+  content/Mod/characters/bf.json
+  content/Mod/songs/tutorial/Inst.ogg
 ```
 
 The engine scans zip files automatically. You do not have to add them to `modsList.txt`.
@@ -79,29 +79,17 @@ songs/song/meta.json
 data/song/meta.json
 ```
 
-## Built-In Code Editor
-
-Open `Editors > Code Editor` in-game. It can browse `.lua` and `.hx` scripts from loose mods and zip mods.
-
-Zip files are read-only by design. If you save a script opened from zip, the editor writes an editable override to:
-
-```text
-content/mod-name/path/from/zip.lua
-```
-
-That lets you test changes immediately without repacking the zip.
-
 ## Startup State
 
 You can choose the first in-game screen with `engine.json` or `startup.json` in `content/`, the game root, a loose mod folder, or the root of a zip mod:
 
 ```json
 {
-  "firstState": "code-editor"
+  "firstState": "freeplay"
 }
 ```
 
-Built-in values: `title`, `main-menu`, `freeplay`, `story`, `mods`, `editors`, `chart-editor`, `character-editor`, `code-editor`.
+Built-in values: `title`, `main-menu`, `freeplay`, `story`, `mods`, `editors`, `chart-editor`, `character-editor`.
 
 ## Minimal Windows Package
 

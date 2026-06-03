@@ -1,12 +1,7 @@
 package backend;
 
 /**
- * LOCAL ENGINE — NotePool
- *
- *   notePool = new NotePool(64);
- *   var note = notePool.get(strumTime, noteData, oldNote);
- *   notePool.recycle(note);
- *   notePool.destroy();
+ * Reuses Note instances to avoid allocation spikes during gameplay.
  */
 
 import objects.Note;

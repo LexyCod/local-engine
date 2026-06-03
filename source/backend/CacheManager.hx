@@ -1,6 +1,6 @@
 package backend;
 
-//LOCAL ENGINE — CacheManager
+// Tracks loaded textures and evicts unused entries when memory gets high.
 
 import flixel.FlxG;
 import flixel.graphics.FlxGraphic;
@@ -83,7 +83,7 @@ class CacheManager
 	{
 		if (!_entries.exists(key)) return false;
 		var entry = _entries[key];
-		if (entry.pinned) { #if (debug || dev) trace('[CacheManager] not export pinned: $key'); #end return false; }
+		if (entry.pinned) { #if (debug || dev) trace('[CacheManager] Keeping pinned texture: $key'); #end return false; }
 
 		_destroyTexture(key);
 		stats.evictions++;

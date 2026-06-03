@@ -15,7 +15,7 @@ import lime.app.Future;
 //переделано с нуля нахуй пдорас н рабочий
 class LoadingState extends MusicBeatState
 {
-	static inline var MIN_TIME:Float = 0.5;
+	static inline var MIN_TIME:Float = 0.0;
 
 	var target:FlxState;
 	var stopMusic:Bool;
@@ -47,27 +47,23 @@ class LoadingState extends MusicBeatState
 
 	override function create()
 	{
-		var bg = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, 0xffcaff4d);
-		bg.antialiasing = ClientPrefs.data.antialiasing;
-		//add(bg);
-
-		funkay = new FlxSprite().loadGraphic(Paths.getPath('images/funkay.png', IMAGE));
-		funkay.setGraphicSize(0, FlxG.height);
-		funkay.updateHitbox();
-		funkay.antialiasing = ClientPrefs.data.antialiasing;
-		funkay.scrollFactor.set();
-		funkay.screenCenter();
-		//add(funkay);
-
 		loadBar = new FlxSprite(0, FlxG.height - 20).makeGraphic(FlxG.width, 10, 0xffff16d2);
 		loadBar.screenCenter(X);
 		loadBar.scale.x = 0;
 		//add(loadBar);
 
-		new FlxTimer().start(MIN_TIME, function(_) {
+		if (MIN_TIME <= 0)
+		{
 			_minTimeDone = true;
 			_tryFinish();
-		});
+		}
+		else
+		{
+			new FlxTimer().start(MIN_TIME, function(_) {
+				_minTimeDone = true;
+				_tryFinish();
+			});
+		}
 
 		FlxG.camera.fade(FlxG.camera.bgColor, 0.5, true);
 
@@ -81,6 +77,10 @@ class LoadingState extends MusicBeatState
 			#if debug trace('[LoadingState] Manifest ready'); #end
 			_manifestReady = true;
 			_startAudio(); // аудио только после manifest
+		}).onError(function(e) {
+			#if debug trace('[LoadingState] Songs manifest skipped: $e'); #end
+			_manifestReady = true;
+			_startAudio();
 		});
 	}
 
@@ -156,6 +156,7 @@ class LoadingState extends MusicBeatState
 	function _startSpritePreloader():Void
 	{
 		_preloader = new SpritePreloader();
+		_preloader.tasksPerTick = 16;
 		_preloader.onProgress = function(p) { _preloadProgress = p; };
 		_preloader.onComplete = function() {
 			_preloadDone = true;
@@ -179,7 +180,7 @@ class LoadingState extends MusicBeatState
 		var texP    = _preloadProgress;
 		var manifestP = _manifestReady ? 1.0 : 0.0;
 		_barTarget  = (audioP + texP + manifestP) / 3.0;
-		loadBar.scale.x += 0.15 * (_barTarget - loadBar.scale.x);
+		if (loadBar != null) loadBar.scale.x += 0.15 * (_barTarget - loadBar.scale.x);
 
 		_tryFinish();
 	}
@@ -190,7 +191,7 @@ class LoadingState extends MusicBeatState
 		if (!_audioReady || !_preloadDone || !_minTimeDone) return;
 
 		_switching = true;
-		loadBar.scale.x = 1;
+		if (loadBar != null) loadBar.scale.x = 1;
 
 		#if debug trace('[LoadingState] ✓ All ready — switching!'); #end
 

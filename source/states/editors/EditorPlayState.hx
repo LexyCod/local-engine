@@ -176,11 +176,14 @@ class EditorPlayState extends MusicBeatSubstate
 		{
 			var time:Float = spawnTime * playbackRate;
 			if(songSpeed < 1) time /= songSpeed;
-			if(unspawnNotes[0].multSpeed < 1) time /= unspawnNotes[0].multSpeed;
+			var nextUnspawn:Note = unspawnNotes[unspawnNotes.length - 1];
+			if(nextUnspawn != null && nextUnspawn.multSpeed < 1) time /= nextUnspawn.multSpeed;
 
-			while (unspawnNotes.length > 0 && unspawnNotes[0].strumTime - Conductor.songPosition < time)
+			while (unspawnNotes.length > 0)
 			{
-				var dunceNote:Note = unspawnNotes.shift();
+				var dunceNote:Note = unspawnNotes[unspawnNotes.length - 1];
+				if (dunceNote == null || dunceNote.strumTime - Conductor.songPosition >= time) break;
+				unspawnNotes.pop();
 				notes.insert(0, dunceNote);
 				dunceNote.spawned = true;
 			}
@@ -447,6 +450,7 @@ class EditorPlayState extends MusicBeatSubstate
 		}
 
 		unspawnNotes.sort(PlayState.sortByTime);
+		unspawnNotes.reverse();
 	}
 	
 	private function generateStaticArrows(player:Int):Void

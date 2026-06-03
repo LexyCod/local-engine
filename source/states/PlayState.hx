@@ -270,6 +270,8 @@ class PlayState extends MusicBeatState
 	public var startCallback:Void->Void = null;
 	public var endCallback:Void->Void = null;
 
+	private var lastCamSection:Int = -1;
+
 	override public function create()
 	{
 		//trace('Playback Rate: ' + playbackRate);
@@ -1509,7 +1511,9 @@ class PlayState extends MusicBeatState
 				makeEvent(event, i);
 
 		unspawnNotes.sort(sortByTime);
+		unspawnNotes.reverse();
 		generatedMusic = true;
+		lastCamSection = -1;
 	}
 
 	// called only once per different event (Used for precaching)
@@ -1878,11 +1882,14 @@ class PlayState extends MusicBeatState
 		{
 			var time:Float = spawnTime * playbackRate;
 			if(songSpeed < 1) time /= songSpeed;
-			if(unspawnNotes[0].multSpeed < 1) time /= unspawnNotes[0].multSpeed;
+			var nextUnspawn:Note = unspawnNotes[unspawnNotes.length - 1];
+			if(nextUnspawn != null && nextUnspawn.multSpeed < 1) time /= nextUnspawn.multSpeed;
 
-			while (unspawnNotes.length > 0 && unspawnNotes[0].strumTime - Conductor.songPosition < time)
+			while (unspawnNotes.length > 0)
 			{
-				var dunceNote:Note = unspawnNotes.shift();
+				var dunceNote:Note = unspawnNotes[unspawnNotes.length - 1];
+				if (dunceNote == null || dunceNote.strumTime - Conductor.songPosition >= time) break;
+				unspawnNotes.pop();
 				notes.insert(0, dunceNote);
 				dunceNote.spawned = true;
 
@@ -1945,6 +1952,14 @@ class PlayState extends MusicBeatState
 				}
 			}
 			checkEventNote();
+		}
+
+		if (!inCutscene && !paused && generatedMusic && !endingSong && !isCameraOnForcedPos) {
+			var curSec:Int = curSection;
+			if (curSec != lastCamSection && SONG.notes[curSec] != null) {
+				lastCamSection = curSec;
+				moveCameraSection();
+			}
 		}
 
 		#if (debug || dev)

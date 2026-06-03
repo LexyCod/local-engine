@@ -101,8 +101,6 @@ class StartupStateResolver
 				return new states.editors.ChartingState();
 			case 'character' | 'charactereditor' | 'charactereditorstate':
 				return new states.editors.CharacterEditorState(objects.Character.DEFAULT_CHARACTER, false);
-			case 'code' | 'script' | 'codeeditor' | 'scripteditor' | 'scripteditorstate':
-				return new states.editors.ScriptEditorState();
 		}
 
 		#if (debug || dev) trace('[StartupStateResolver] Unknown firstState "$name"'); #end

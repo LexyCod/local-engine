@@ -9,6 +9,7 @@ class SpritePreloader
 {
 	public var onProgress:Float->Void = null;
 	public var onComplete:Void->Void  = null;
+	public var tasksPerTick:Int = 8;
 
 	var _queue:Array<PreloadTask> = [];
 	var _done:Int    = 0;
@@ -57,16 +58,26 @@ class SpritePreloader
 	public function tick():Void
 	{
 		if (_finished || !_started || _queue.length == 0) return;
-		var task = _queue.shift();
-		_execute(task);
-		_done++;
+		var processed:Int = 0;
+		while (_queue.length > 0 && processed < tasksPerTick)
+		{
+			var task = _queue.shift();
+			_execute(task);
+			_done++;
+			processed++;
+		}
 		if (onProgress != null && _total > 0) onProgress(_done / _total);
 		if (_queue.length == 0) _finish();
 	}
 
 	function _scanNotes():Void
 	{
-		for (key in ['NOTE_assets', 'noteSplashes', 'NOTE_hold_assets'])
+		if (PlayState.SONG != null && PlayState.SONG.arrowSkin != null && PlayState.SONG.arrowSkin.length > 0)
+			_enqueueAuto(PlayState.SONG.arrowSkin);
+		if (PlayState.SONG != null && PlayState.SONG.splashSkin != null && PlayState.SONG.splashSkin.length > 0)
+			_enqueueAuto(PlayState.SONG.splashSkin);
+
+		for (key in ['noteSkins/NOTE_assets', 'noteSplashes', 'noteSplashes/noteSplashes-electric'])
 			_enqueueAuto(key);
 	}
 
@@ -148,7 +159,6 @@ class SpritePreloader
 	{
 		if (_finished) return;
 		_finished = true;
-		openfl.system.System.gc();
 		#if debug trace('[SpritePreloader] done $_done'); #end
 		if (onComplete != null) onComplete();
 	}

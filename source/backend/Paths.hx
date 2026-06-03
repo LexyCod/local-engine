@@ -87,6 +87,8 @@ class Paths
 	// define the locally tracked assets
 	public static var localTrackedAssets:Array<String> = [];
 	public static function clearStoredMemory() {
+		currentTrackedFrames.clear();
+
 		// clear anything not in the tracked assets list
 		@:privateAccess
 		for (key in FlxG.bitmap._cache.keys())
@@ -240,6 +242,7 @@ class Paths
 	}
 
 	public static var currentTrackedAssets:Map<String, FlxGraphic> = [];
+	public static var currentTrackedFrames:Map<String, FlxAtlasFrames> = [];
 	static public function image(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxGraphic
 	{
 		var bitmap:BitmapData = null;
@@ -296,6 +299,14 @@ class Paths
 
 	static public function cacheBitmap(file:String, ?bitmap:BitmapData = null, ?allowGPU:Bool = true)
 	{
+		if (file != null && currentTrackedAssets.exists(file))
+		{
+			if (!localTrackedAssets.contains(file)) localTrackedAssets.push(file);
+			var cachedGraphic = currentTrackedAssets.get(file);
+			CacheManager.onTextureLoaded(file, cachedGraphic);
+			return cachedGraphic;
+		}
+
 		if(bitmap == null)
 		{
 			#if MODS_ALLOWED
@@ -314,6 +325,13 @@ class Paths
 					{
 						bitmap = bitmapFromBytes(assetBytes);
 						file = ZipModManager.getAssetId(file);
+						if (currentTrackedAssets.exists(file))
+						{
+							if (!localTrackedAssets.contains(file)) localTrackedAssets.push(file);
+							var cachedGraphic = currentTrackedAssets.get(file);
+							CacheManager.onTextureLoaded(file, cachedGraphic);
+							return cachedGraphic;
+						}
 					}
 				}
 			}
@@ -321,7 +339,7 @@ class Paths
 			if(bitmap == null) return null;
 		}
 
-		localTrackedAssets.push(file);
+		if (!localTrackedAssets.contains(file)) localTrackedAssets.push(file);
 		if (allowGPU && ClientPrefs.data.cacheOnGPU)
 		{
 			var texture:RectangleTexture = FlxG.stage.context3D.createRectangleTexture(bitmap.width, bitmap.height, BGRA, true);
@@ -497,43 +515,74 @@ class Paths
 
 	static public function getAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
+		var cached = getCachedFrames('atlas', key, library);
+		if (cached != null) return cached;
+
 		var imageLoaded:FlxGraphic = image(key, library, allowGPU);
+		var frames:FlxAtlasFrames = null;
 
 		var myXml:String = getImageText(key, 'xml', library);
 		if(myXml != null)
 		{
-			return FlxAtlasFrames.fromSparrow(imageLoaded, myXml);
+			frames = FlxAtlasFrames.fromSparrow(imageLoaded, myXml);
 		}
 		else
 		{
 			var myJson:String = getImageText(key, 'json', library);
 			if(myJson != null)
 			{
-				return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, myJson);
+				frames = FlxAtlasFrames.fromTexturePackerJson(imageLoaded, myJson);
 			}
 		}
-		return getPackerAtlas(key, library);
+		if (frames == null) frames = getPackerAtlas(key, library);
+		return cacheFrames('atlas', key, library, frames);
 	}
 
 	static public function getSparrowAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
+		var cached = getCachedFrames('sparrow', key, library);
+		if (cached != null) return cached;
+
 		var imageLoaded:FlxGraphic = image(key, library, allowGPU);
 		var xml = getImageText(key, 'xml', library);
-		return FlxAtlasFrames.fromSparrow(imageLoaded, xml != null ? xml : getPath('images/$key.xml', TEXT, library));
+		return cacheFrames('sparrow', key, library, FlxAtlasFrames.fromSparrow(imageLoaded, xml != null ? xml : getPath('images/$key.xml', TEXT, library)));
 	}
 
 	static public function getPackerAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
+		var cached = getCachedFrames('packer', key, library);
+		if (cached != null) return cached;
+
 		var imageLoaded:FlxGraphic = image(key, library, allowGPU);
 		var txt = getImageText(key, 'txt', library);
-		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, txt != null ? txt : getPath('images/$key.txt', TEXT, library));
+		return cacheFrames('packer', key, library, FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, txt != null ? txt : getPath('images/$key.txt', TEXT, library)));
 	}
 
 	static public function getAsepriteAtlas(key:String, ?library:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
+		var cached = getCachedFrames('aseprite', key, library);
+		if (cached != null) return cached;
+
 		var imageLoaded:FlxGraphic = image(key, library, allowGPU);
 		var json = getImageText(key, 'json', library);
-		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, json != null ? json : getPath('images/$key.json', TEXT, library));
+		return cacheFrames('aseprite', key, library, FlxAtlasFrames.fromTexturePackerJson(imageLoaded, json != null ? json : getPath('images/$key.json', TEXT, library)));
+	}
+
+	static function getCachedFrames(kind:String, key:String, ?library:String):FlxAtlasFrames
+	{
+		return currentTrackedFrames.get(frameCacheKey(kind, key, library));
+	}
+
+	static function cacheFrames(kind:String, key:String, ?library:String, frames:FlxAtlasFrames):FlxAtlasFrames
+	{
+		if (frames != null)
+			currentTrackedFrames.set(frameCacheKey(kind, key, library), frames);
+		return frames;
+	}
+
+	static function frameCacheKey(kind:String, key:String, ?library:String):String
+	{
+		return kind + ':' + (library == null ? '' : library) + ':' + key;
 	}
 
 	inline static public function formatToSongPath(path:String) {

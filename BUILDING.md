@@ -93,7 +93,7 @@ For a small Windows release folder, run:
 powershell -ExecutionPolicy Bypass -File tools/package-windows.ps1 -Configuration release
 ```
 
-More info about zip mods, packed assets, chart compatibility, and packaging is in
+More info about zip mods, packed assets, chart compatibility, startup state, and packaging is in
 [`MODDING_AND_PACKAGING.md`](./MODDING_AND_PACKAGING.md).
 Startup state can also be configured from `engine.json` or `startup.json`; see the same doc.
 

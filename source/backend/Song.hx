@@ -286,28 +286,47 @@ class Song
 		var parsed = Json.parse(rawJson);
 		if (parsed == null) throw 'invalid json: null result';
 
-		if (Reflect.hasField(parsed, 'strumLines'))
+		var cleaned:Dynamic = cleanSongData(parsed);
+		if (Reflect.hasField(cleaned, 'format') && Std.string(Reflect.field(cleaned, 'format')).startsWith('psych_v1'))
+			Reflect.setField(cleaned, 'chartVersion', Std.string(Reflect.field(cleaned, 'format')).substr('psych_v'.length));
+
+		if (Reflect.hasField(cleaned, 'strumLines') || Reflect.field(cleaned, 'codenameChart') == true)
 			return cast convertCodenameChart(parsed, fallbackSong, meta);
 
-		var songField = Reflect.field(parsed, 'song');
+		var songField = Reflect.field(cleaned, 'song');
 		if (songField != null && Std.isOfType(songField, String))
 		{
-			if (Reflect.hasField(parsed, 'notes'))
-				return cast parsed;
+			if (Reflect.hasField(cleaned, 'notes'))
+				return cast cleaned;
 			throw 'invalid json: missing "notes" field';
 		}
 
 		if (songField != null && Reflect.hasField(songField, 'notes'))
 			return cast songField;
 
-		if (Reflect.hasField(parsed, 'notes'))
-			return cast parsed;
+		if (Reflect.hasField(cleaned, 'notes'))
+			return cast cleaned;
 
 		throw 'invalid json: missing "song" or "notes" field';
 	}
 
+	static function cleanSongData(data:Dynamic):Dynamic
+	{
+		if (data != null && Reflect.hasField(data, 'song'))
+		{
+			var field:Dynamic = Reflect.field(data, 'song');
+			if (field != null && !Std.isOfType(field, String))
+				return field;
+		}
+		return data;
+	}
+
 	static function convertCodenameChart(chart:Dynamic, fallbackSong:String, ?meta:Dynamic):Dynamic
 	{
+		chart = cleanSongData(chart);
+		var chartMeta:Dynamic = Reflect.field(chart, 'meta');
+		if (meta == null) meta = chartMeta;
+
 		var bpm:Float = numField(chart, ['bpm'], numField(meta, ['bpm'], 100));
 		var speed:Float = numField(chart, ['scrollSpeed', 'speed'], numField(meta, ['scrollSpeed', 'speed'], 1));
 		var songName:String = strField(meta, ['name', 'song', 'displayName'], strField(chart, ['song', 'name'], fallbackSong));
@@ -315,6 +334,12 @@ class Song
 		var player2:String = strField(meta, ['opponent', 'player2', 'dad'], 'dad');
 		var gfVersion:String = strField(meta, ['girlfriend', 'gf', 'player3'], 'gf');
 		var stage:String = strField(meta, ['stage'], strField(chart, ['stage'], null));
+		var needsVoices:Bool = boolField(meta, ['needsVoices'], boolField(chart, ['needsVoices'], true));
+		var noteTypes:Array<String> = [];
+		var rawNoteTypes:Dynamic = Reflect.field(chart, 'noteTypes');
+		if (Std.isOfType(rawNoteTypes, Array))
+			for (noteType in cast(rawNoteTypes, Array<Dynamic>))
+				noteTypes.push(Std.string(noteType));
 
 		var sectionLength:Float = (60 / Math.max(1, bpm)) * 4 * 1000;
 		var sections:Array<Dynamic> = [];
@@ -329,6 +354,16 @@ class Song
 			{
 				var line:Dynamic = lines[lineIndex];
 				var mustPress:Bool = codenameLineIsPlayer(line, lineIndex, lines.length);
+				var firstCharacter:String = firstArrayString(Reflect.field(line, 'characters'));
+				if (firstCharacter != null && firstCharacter.length > 0)
+				{
+					var lineType:Int = Std.int(numField(line, ['type'], mustPress ? 1 : 0));
+					var position:String = strField(line, ['position'], '').toLowerCase();
+					if (lineType == 1) player1 = firstCharacter;
+					else if (lineType == 0) player2 = firstCharacter;
+					else if (position == 'girlfriend' || position == 'gf') gfVersion = firstCharacter;
+				}
+
 				var lineNotes:Dynamic = Reflect.field(line, 'notes');
 				if (!Std.isOfType(lineNotes, Array)) continue;
 
@@ -338,7 +373,8 @@ class Song
 					var data:Int = Std.int(numField(note, ['id', 'data', 'noteData', 'direction'], 0)) % 4;
 					if (data < 0) data += 4;
 					var sustain:Float = numField(note, ['length', 'sLen', 'sustainLength', 'duration'], 0);
-					var type:String = strField(note, ['type', 'noteType'], '');
+					var type:String = convertCodenameNoteType(Reflect.field(note, 'type'), noteTypes);
+					if (type.length < 1) type = strField(note, ['noteType'], '');
 					var psychData:Int = data + (mustPress ? 0 : 4);
 					var noteEntry:Array<Dynamic> = [time, psychData, sustain, type];
 					getSection(sections, Std.int(Math.floor(time / sectionLength)), bpm).sectionNotes.push(noteEntry);
@@ -353,7 +389,7 @@ class Song
 			for (event in cast(rawEvents, Array<Dynamic>))
 			{
 				var time:Float = numField(event, ['time', 'strumTime', 't'], 0);
-				var name:String = strField(event, ['name', 'event', 'type'], '');
+				var name:String = convertCodenameEventName(event);
 				var params:Dynamic = Reflect.field(event, 'params');
 				var v1:String = '';
 				var v2:String = '';
@@ -381,7 +417,7 @@ class Song
 			notes: sections,
 			events: events,
 			bpm: bpm,
-			needsVoices: true,
+			needsVoices: needsVoices,
 			speed: speed,
 			player1: player1,
 			player2: player2,
@@ -410,6 +446,10 @@ class Song
 
 	static function codenameLineIsPlayer(line:Dynamic, lineIndex:Int, lineCount:Int):Bool
 	{
+		var lineType:Float = numField(line, ['type'], -1);
+		if (lineType == 1) return true;
+		if (lineType == 0 || lineType == 2) return false;
+
 		var explicit:Dynamic = Reflect.field(line, 'mustPress');
 		if (explicit == null) explicit = Reflect.field(line, 'player');
 		if (Std.isOfType(explicit, Bool)) return explicit;
@@ -418,6 +458,47 @@ class Song
 		if (pos == 'boyfriend' || pos == 'bf' || pos == 'player' || pos == 'right') return true;
 		if (pos == 'dad' || pos == 'opponent' || pos == 'left') return false;
 		return lineCount == 1 || lineIndex > 0;
+	}
+
+	static function convertCodenameNoteType(rawType:Dynamic, noteTypes:Array<String>):String
+	{
+		if (rawType == null) return '';
+		var typeNum:Float = Std.parseFloat(Std.string(rawType));
+		if (!Math.isNaN(typeNum))
+		{
+			var index:Int = Std.int(typeNum);
+			if (index <= 0) return '';
+			return noteTypes != null && noteTypes[index - 1] != null ? noteTypes[index - 1] : '';
+		}
+		var value:String = Std.string(rawType);
+		return value == 'Default Note' ? '' : value;
+	}
+
+	static function convertCodenameEventName(event:Dynamic):String
+	{
+		var rawName:Dynamic = Reflect.field(event, 'name');
+		if (rawName == null) rawName = Reflect.field(event, 'event');
+		if (rawName != null) return Std.string(rawName);
+
+		var rawType:Dynamic = Reflect.field(event, 'type');
+		var type:Int = Std.int(numField(event, ['type'], -999));
+		return switch (type)
+		{
+			case 1: 'Camera Movement';
+			case 2: 'BPM Change';
+			case 3: 'Alt Animation Toggle';
+			default: rawType != null ? Std.string(rawType) : '';
+		}
+	}
+
+	static function firstArrayString(value:Dynamic):String
+	{
+		if (Std.isOfType(value, Array))
+		{
+			var arr:Array<Dynamic> = cast value;
+			if (arr.length > 0 && arr[0] != null) return Std.string(arr[0]);
+		}
+		return null;
 	}
 
 	static function numField(obj:Dynamic, names:Array<String>, fallback:Float):Float
@@ -440,6 +521,21 @@ class Song
 		{
 			var value:Dynamic = Reflect.field(obj, name);
 			if (value != null) return Std.string(value);
+		}
+		return fallback;
+	}
+
+	static function boolField(obj:Dynamic, names:Array<String>, fallback:Bool):Bool
+	{
+		if (obj == null) return fallback;
+		for (name in names)
+		{
+			var value:Dynamic = Reflect.field(obj, name);
+			if (value == null) continue;
+			if (Std.isOfType(value, Bool)) return value;
+			var text:String = Std.string(value).toLowerCase();
+			if (text == 'true') return true;
+			if (text == 'false') return false;
 		}
 		return fallback;
 	}
