@@ -1,5 +1,4 @@
 План что осталось по первой части 
 Доделать поиск модов и ассетов по zip
-Доделать note loops в character editor
 
 state editor.. fucking way
