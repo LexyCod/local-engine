@@ -384,7 +384,14 @@ class FreeplayState extends MusicBeatState
 				trace('ERROR! $e');
 
 				var errorStr:String = e.toString();
-				if(errorStr.startsWith('[file_contents,assets/data/')) errorStr = 'Missing file: ' + errorStr.substring(34, errorStr.length-1); //Missing chart
+				if (errorStr.startsWith('[file_contents,assets/songs/')) 
+				{
+					errorStr = 'Missing file: ' + errorStr.substring(29, errorStr.length - 1); 
+				}
+				else if (errorStr.contains('chart/')) 
+				{
+					errorStr = 'Missing chart file: ' + errorStr.substring(errorStr.indexOf('songs/'), errorStr.length - 1);
+				}
 				missingText.text = 'ERROR WHILE LOADING CHART:\n$errorStr';
 				missingText.screenCenter(Y);
 				missingText.visible = true;

@@ -41,9 +41,9 @@ class FPSCounter extends Sprite
 		textField.selectable = false;
 		textField.mouseEnabled = false;
 		#if (debug || dev)
-		textField.defaultTextFormat = new TextFormat(Paths.font("vcr.ttf"), 14, color);
+		textField.defaultTextFormat = new TextFormat(Paths.font("optimistic.ttf"), 14, color);
 		#else
-		textField.defaultTextFormat = new TextFormat(Paths.font("vcr.ttf"), 10, color);
+		textField.defaultTextFormat = new TextFormat(Paths.font("optimistic.ttf"), 10, color);
 		#end
 		textField.autoSize = LEFT;
 		textField.multiline = true;

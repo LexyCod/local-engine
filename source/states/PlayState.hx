@@ -431,14 +431,14 @@ class PlayState extends MusicBeatState
 		add(luaDebugGroup);
 		#end
 
-		// "GLOBAL" SCRIPTS
+		// SONG SPECIFIC SCRIPTS
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
-		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'scripts/'))
+		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'songs/$songName/scripts/'))
 			loadScriptDirectory(folder);
 		#if MODS_ALLOWED
-		loadLooseScriptDirectory('scripts/');
+		loadLooseScriptDirectory('songs/$songName/scripts/');
 		for (mod in Mods.parseList().enabled)
-			loadModScriptDirectory(mod, 'scripts/');
+			loadModScriptDirectory(mod, 'songs/$songName/scripts/');
 		#end
 		#end
 
@@ -1386,7 +1386,7 @@ class PlayState extends MusicBeatState
 		// NEW SHIT
 		noteData = songData.notes;
 
-		if (Paths.getTextFromFile('data/$songName/events.json') != null)
+		if (Paths.getTextFromFile('songs/$songName/chart/events.json') != null)
 		{
 			var eventsData:Array<Dynamic> = Song.loadFromJson('events', songName).events;
 			for (event in eventsData) //Event Notes

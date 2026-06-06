@@ -98,6 +98,8 @@ class CharacterEditorState extends MusicBeatState
 		@:privateAccess haxe.ui.backend.flixel.CursorHelper.mouseLoadFunction = function(id:String) { return null; };
 		if(ClientPrefs.data.cacheOnGPU) Paths.clearStoredMemory();
 
+		FlxG.mouse.visible = true;
+
 		FlxG.sound.music.stop();
 		camEditor = initPsychCamera();
 

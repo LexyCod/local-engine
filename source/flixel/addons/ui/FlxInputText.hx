@@ -759,6 +759,7 @@ class FlxInputText extends FlxText
 					caret.pixels.fillRect(r, caretC); // draw caret
 					caret.offset.x = caret.offset.y = 0;
 
+				#if (flixel >= "5.9.0")
 				case SHADOW_XY(offsetX, offsetY):
 					cw += Std.int(Math.abs(offsetX));
 					ch += Std.int(Math.abs(offsetY));
@@ -766,9 +767,11 @@ class FlxInputText extends FlxText
 					var r:Rectangle = new Rectangle(offsetX > 0 ? offsetX : 0, offsetY > 0 ? offsetY : 0, caretWidth, Std.int(size + 2));
 					caret.pixels.fillRect(r, borderC); // draw shadow
 					r.x = r.y = 0;
-					caret.pixels.fillRect(r, caretC); // draw caret
+					caret.pixels.fillRect(r, caretC);
+					// draw caret
 					caret.offset.x = (offsetX < 0 ? -offsetX : 0);
 					caret.offset.y = (offsetY < 0 ? -offsetY : 0);
+				#end
 
 				case OUTLINE_FAST, OUTLINE:
 					// Border all around it

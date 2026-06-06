@@ -200,6 +200,7 @@ class Song
 		var rawJson = null;
 		
 		if(folder == null) folder = jsonInput;
+		
 		var formattedFolder:String = Paths.formatToSongPath(folder);
 		var formattedSong:String = Paths.formatToSongPath(jsonInput);
 		var difficultyName:String = formattedSong;
@@ -208,54 +209,55 @@ class Song
 		if (difficultyName == formattedFolder || difficultyName.length < 1)
 			difficultyName = 'normal';
 
-		rawJson = firstText([
-			'data/$formattedFolder/$formattedSong.json',
-			'data/$formattedFolder/charts/$difficultyName.json',
-			'data/$formattedFolder/charts/$formattedSong.json',
-			'songs/$formattedFolder/charts/$difficultyName.json',
-			'songs/$formattedFolder/charts/$formattedSong.json',
-			'songs/$formattedFolder/$formattedSong.json'
-		]);
+		#if sys
+		// Проверяем сначала в папке модов, затем в корневойassets/songs/ напрямую через диск
+		var modPath:String = Paths.modsJson('songs/$formattedFolder/chart/$formattedSong');
+		var localPath:String = 'assets/songs/$formattedFolder/chart/$formattedSong.json';
+		var localDiffPath:String = 'assets/songs/$formattedFolder/chart/$difficultyName.json';
+
+		if (FileSystem.exists(modPath)) {
+			rawJson = File.getContent(modPath).trim();
+		} else if (FileSystem.exists(localPath)) {
+			rawJson = File.getContent(localPath).trim();
+		} else if (FileSystem.exists(localDiffPath)) {
+			rawJson = File.getContent(localDiffPath).trim();
+		}
+		#end
+
+		// Если через FileSystem не нашли (например на HTML5 или если пути съехали), пробуем старый массив
+		if (rawJson == null) {
+			rawJson = firstText([
+				'songs/$formattedFolder/chart/$formattedSong.json',
+				'songs/$formattedFolder/chart/$difficultyName.json',
+				'assets/songs/$formattedFolder/chart/$formattedSong.json'
+			]);
+		}
 
 		if(rawJson == null) {
-			var path:String = Paths.json(formattedFolder + '/' + formattedSong);
-
-			#if sys
-			if(FileSystem.exists(path))
-				rawJson = File.getContent(path).trim();
-			else
-			#end
-				rawJson = Assets.getText(Paths.json(formattedFolder + '/' + formattedSong)).trim();
+			// Если вообще ничего не помогло, выдаем понятную ошибку
+			throw 'Could not find chart file for: $formattedSong in songs/$formattedFolder/chart/';
 		}
 		else rawJson = rawJson.trim();
 
 		while (!rawJson.endsWith("}"))
 		{
 			rawJson = rawJson.substr(0, rawJson.length - 1);
-			// LOL GOING THROUGH THE BULLSHIT TO CLEAN IDK WHATS STRANGE
 		}
 
-		// FIX THE CASTING ON WINDOWS/NATIVE
-		// Windows???
-		// trace(songData);
+		// Точно так же переписываем чтение мета-данных через диск
+		var metaRaw:String = null;
+		#if sys
+		var localMeta:String = 'assets/songs/$formattedFolder/chart/meta.json';
+		if (FileSystem.exists(localMeta)) metaRaw = File.getContent(localMeta).trim();
+		#end
 
-		// trace('LOADED FROM JSON: ' + songData.notes);
-		/* 
-			for (i in 0...songData.notes.length)
-			{
-				trace('LOADED FROM JSON: ' + songData.notes[i].sectionNotes);
-				// songData.notes[i].sectionNotes = songData.notes[i].sectionNotes
-			}
-
-				daNotes = songData.notes;
-				daSong = songData.song;
-				daBpm = songData.bpm; */
-
-		var metaRaw:String = firstText([
-			'songs/$formattedFolder/meta.json',
-			'data/$formattedFolder/meta.json',
-			'data/$formattedFolder/$formattedFolder-metadata.json'
-		]);
+		if (metaRaw == null) {
+			metaRaw = firstText([
+				'songs/$formattedFolder/chart/meta.json',
+				'songs/$formattedFolder/meta.json'
+			]);
+		}
+		
 		var meta:Dynamic = null;
 		if (metaRaw != null)
 		{

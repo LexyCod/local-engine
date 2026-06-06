@@ -181,6 +181,9 @@ class Paths
 
 	inline static public function json(key:String, ?library:String)
 	{
+		if (key.startsWith('songs/'))
+			return 'assets/$key.json';
+
 		return getPath('data/$key.json', TEXT, library);
 	}
 
@@ -225,20 +228,38 @@ class Paths
 		return file;
 	}
 
-	inline static public function voices(song:String, postfix:String = null):Any
+	static public function voices(song:String, ?postfix:String = null):Dynamic
 	{
-		var songKey:String = '${formatToSongPath(song)}/Voices';
-		if(postfix != null) songKey += '-' + postfix;
-		//trace('songKey test: $songKey');
-		var voices = returnSound(null, songKey, 'songs');
-		return voices;
+		var songKey:String = formatToSongPath(song);
+		
+		var file:String = (postfix != null && postfix.length > 0) ? 'Voices-$postfix' : 'Voices';
+		var fileKey:String = 'songs/' + songKey + '/audio/' + file;
+
+		#if MODS_ALLOWED
+		var modFile:String = modFolders(fileKey + '.' + SOUND_EXT);
+		if(sys.FileSystem.exists(modFile)) return cast openfl.media.Sound.fromFile(modFile);
+		#end
+
+		var localFile:String = 'assets/' + fileKey + '.' + SOUND_EXT;
+		if(sys.FileSystem.exists(localFile)) return cast openfl.media.Sound.fromFile(localFile);
+
+		return null;
 	}
 
-	inline static public function inst(song:String):Any
+	static public function inst(song:String):Dynamic
 	{
-		var songKey:String = '${formatToSongPath(song)}/Inst';
-		var inst = returnSound(null, songKey, 'songs');
-		return inst;
+		var songKey:String = formatToSongPath(song);
+		var fileKey:String = 'songs/' + songKey + '/audio/Inst';
+
+		#if MODS_ALLOWED
+		var modFile:String = modFolders(fileKey + '.' + SOUND_EXT);
+		if(sys.FileSystem.exists(modFile)) return cast openfl.media.Sound.fromFile(modFile);
+		#end
+
+		var localFile:String = 'assets/' + fileKey + '.' + SOUND_EXT;
+		if(sys.FileSystem.exists(localFile)) return cast openfl.media.Sound.fromFile(localFile);
+
+		return getPath(fileKey + '.' + SOUND_EXT, SOUND, null);
 	}
 
 	public static var currentTrackedAssets:Map<String, FlxGraphic> = [];
@@ -837,6 +858,9 @@ class Paths
 	}
 
 	inline static public function modsJson(key:String) {
+		if (key.contains('songs/'))
+			return modFolders(key + '.json');
+
 		return modFolders('data/' + key + '.json');
 	}
 

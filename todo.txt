@@ -1,4 +1,5 @@
 План что осталось по первой части 
 Доделать поиск модов и ассетов по zip
+chart editor
 
 state editor.. fucking way
