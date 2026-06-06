@@ -3079,8 +3079,13 @@ class PlayState extends MusicBeatState
 
 			if(char != null)
 			{
-				char.playAnim(animToPlay, true);
-				char.holdTimer = 0;
+				var anim:String = animToPlay + note.animSuffix;
+                
+                if (char.vSliceSustains && note.isSustainNote && char.getAnimationName() == anim) {
+                } else {
+                    char.playAnim(anim, true);
+                    char.holdTimer = 0;
+                }
 			}
 		}
 
@@ -3171,8 +3176,12 @@ class PlayState extends MusicBeatState
 
 			if(char != null)
 			{
-				char.playAnim(animToPlay + note.animSuffix, true);
-				char.holdTimer = 0;
+				var anim:String = animToPlay + note.animSuffix;
+				if (char.vSliceSustains && note.isSustainNote && char.getAnimationName() == anim) {
+                } else {
+                    char.playAnim(anim, true);
+                    char.holdTimer = 0;
+                }
 
 				if(note.noteType == 'Hey!') {
 					if(char.animOffsets.exists(animCheck)) {

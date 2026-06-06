@@ -79,6 +79,8 @@
 	<assets path="assets/fonts" />
 	<assets path="assets/shared" exclude="*.ogg" if="web"/>
 	<assets path="assets/shared" exclude="*.mp3" unless="web"/>
+	<assets path="assets/exclude" exclude="*.ogg" if="web" embed="true"/>
+	<assets path="assets/exclude" exclude="*.mp3" unless="web" embed="true"/>
 	<assets path="assets/soundtray" exclude="*.ogg" if="web" embed="true"/>
 	<assets path="assets/soundtray" exclude="*.mp3" unless="web" embed="true"/>
 	<assets path="assets" include="*.zip" embed="false"/>
@@ -105,12 +107,17 @@
 	<haxelib name="flixel-addons" />
 	<haxelib name="tjson" />
 	<haxelib name="hxopus" if="cpp" />
+	<haxelib name="haxeui-core" />
+	<haxelib name="haxeui-flixel" />
+
+	<haxelib name="moonchart" />
 
 	<haxelib name="linc_luajit" if="cpp" />
 	<haxelib name="SScript" if="desktop" />
 	<haxelib name="hxCodec" if="cpp" />
 	<haxelib name="hxdiscord_rpc" if="cpp" />
 	<haxelib name="flxanimate"/>
+
 
 	<haxedef name="DISCORD_DISABLE_IO_THREAD" if="hxdiscord_rpc" />
 	<haxedef name="NO_PRECOMPILED_HEADERS" if="linux" />

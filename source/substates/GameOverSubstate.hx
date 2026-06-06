@@ -31,6 +31,15 @@ class GameOverSubstate extends MusicBeatSubstate
 		loopSoundName = 'gameOver';
 		endSoundName = 'gameOverEnd';
 
+		var _bf = PlayState.instance != null ? PlayState.instance.boyfriend : null;
+		if (_bf != null)
+		{
+			if (_bf.gameoverCharacter != null && _bf.gameoverCharacter.trim().length > 0) characterName = _bf.gameoverCharacter;
+			if (_bf.gameoverInitialDeathSound != null && _bf.gameoverInitialDeathSound.trim().length > 0) deathSoundName = _bf.gameoverInitialDeathSound;
+			if (_bf.gameoverLoopDeathSound != null && _bf.gameoverLoopDeathSound.trim().length > 0) loopSoundName = _bf.gameoverLoopDeathSound;
+			if (_bf.gameoverConfirmDeathSound != null && _bf.gameoverConfirmDeathSound.trim().length > 0) endSoundName = _bf.gameoverConfirmDeathSound;
+		}
+
 		var _song = PlayState.SONG;
 		if(_song != null)
 		{
