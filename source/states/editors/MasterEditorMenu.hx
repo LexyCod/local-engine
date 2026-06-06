@@ -22,7 +22,8 @@ class MasterEditorMenu extends MusicBeatState
 		'Dialogue Editor',
 		'Dialogue Portrait Editor',
 		'Note Splash Debug',
-		'JSON State'
+		'JSON State',
+		'Chart Converter'
 	];
 	private var grpTexts:FlxTypedGroup<Alphabet>;
 	private var directories:Array<String> = [null];
@@ -126,6 +127,8 @@ class MasterEditorMenu extends MusicBeatState
 					MusicBeatState.switchState(new NoteSplashDebugState());
 				case 'JSON State':
 					FlxG.switchState(new DebugJSONState());
+				case 'Chart Converter':
+					MusicBeatState.switchState(new ChartConverterState());
 			}
 			FlxG.sound.music.volume = 0;
 			FreeplayState.destroyFreeplayVocals();

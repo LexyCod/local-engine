@@ -1,0 +1,44 @@
+<vbox style="padding: 40px; spacing: 20px; background-color: #242526;" width="100%" height="100%">
+    <style>
+        * {
+            font-name: "assets/fonts/optimistic.ttf";
+        }
+        
+        .panel-box {
+            background-color: #2C2D2F;
+            border: 1px solid #1C1D1E;
+            padding: 25px;
+            spacing: 15px;
+        }
+
+        .dark-btn {
+            background-color: #3F4143;
+            border: 1px solid #1C1D1E;
+            color: #FFFFFF;
+            font-size: 16px;
+        }
+        .dark-btn:hover {
+            background-color: #4F5255;
+        }
+
+        .desc-box {
+            background-color: #1A1A1B;
+            border: 1px solid #2C2D2F;
+            color: #D0D2D5;
+            padding: 15px;
+        }
+    </style>
+
+    <label text="Chart Converter" style="font-size: 32px; color: #FFFFFF;" horizontalAlign="center" />
+    
+    <vbox styleName="panel-box" horizontalAlign="center" verticalAlign="center" width="55%">
+        <button id="btnVSlice" styleName="dark-btn" text="From VSlice / Base game" width="100%" height="45" />
+        <button id="btnCodename" styleName="dark-btn" text="From Codename Engine" width="100%" height="45" />
+        <button id="btnPsych" styleName="dark-btn" text="From Psych 1.0 (legacy)" width="100%" height="45" />
+    </vbox>
+
+    <label id="txtDesc" text="Select an option to start conversion." 
+           styleName="desc-box"
+           style="font-size: 16px;"
+           width="80%" horizontalAlign="center" verticalAlign="bottom" />
+</vbox>

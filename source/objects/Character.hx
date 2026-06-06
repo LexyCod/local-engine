@@ -29,6 +29,10 @@ typedef CharacterFile = {
 	var healthbar_colors:Array<Int>;
 	var vocals_file:String;
 	@:optional var _editor_isPlayer:Null<Bool>;
+	@:optional var gameoverCharacter:Null<String>;
+	@:optional var gameoverInitialDeathSound:Null<String>;
+	@:optional var gameoverLoopDeathSound:Null<String>;
+	@:optional var gameoverConfirmDeathSound:Null<String>;
 }
 
 typedef AnimArray = {
@@ -39,16 +43,8 @@ typedef AnimArray = {
 	var indices:Array<Int>;
 	var offsets:Array<Int>;
 
-	// LOCAL ENGINE: настройки цикличных нот при зажатии
-	@:optional var hold_type:Null<String>;   // null/"normal" | "static" | "loop2frame"
-	// hold_type:
-	//   null / "normal"   — стандарт Psych, анимация играет как обычно
-	//   "static"          — на кадре hold_static_frame зависает пока нота зажата
-	//   "loop2frame"      — циклит между hold_loop_start и hold_loop_end кадрами
-	@:optional var hold_static_frame:Null<Int>;  // кадр для "static" (дефолт: последний кадр)
-	@:optional var hold_loop_start:Null<Int>;    // начало цикла для "loop2frame"
-	@:optional var hold_loop_end:Null<Int>;      // конец цикла для "loop2frame"
-	@:optional var hold_end_anim:Null<String>;   // анимация которая играет в конце ноты (опционально)
+	@:optional var flipX:Bool;
+	@:optional var flipY:Bool;
 }
 
 class Character extends FlxSprite
@@ -69,15 +65,14 @@ class Character extends FlxSprite
 	public var heyTimer:Float = 0;
 	public var specialAnim:Bool = false;
 
-	// LOCAL ENGINE: состояние hold_type логики
-	var _holdLoopTimer:Float  = 0;   // таймер для loop2frame
-	var _holdActive:Bool      = false; // персонаж сейчас держит ноту
-	var _holdAnimName:String  = '';    // имя sing анимации которая сейчас держится
+	var _holdLoopTimer:Float  = 0;
+	var _holdActive:Bool      = false;
+	var _holdAnimName:String  = '';
 	public var animationNotes:Array<Dynamic> = [];
 	public var stunned:Bool = false;
 	public var singDuration:Float = 4; //Multiplier of how long a character holds the sing pose
 	public var idleSuffix:String = '';
-	public var danceIdle:Bool = false; //Character use "danceLeft" and "danceRight" instead of "idle"
+	public var danceIdle:Bool = false;
 	public var skipDance:Bool = false;
 
 	public var healthIcon:String = 'face';
@@ -96,6 +91,13 @@ class Character extends FlxSprite
 	public var noAntialiasing:Bool = false;
 	public var originalFlipX:Bool = false;
 	public var editorIsPlayer:Null<Bool> = null;
+
+	public var vSliceSustains:Bool = false;
+	public var scalableOffsets:Bool = false;
+	public var gameoverCharacter:Null<String> = null;
+	public var gameoverInitialDeathSound:Null<String> = null;
+	public var gameoverLoopDeathSound:Null<String> = null;
+	public var gameoverConfirmDeathSound:Null<String> = null;
 
 	public function new(x:Float, y:Float, ?character:String = 'bf', ?isPlayer:Bool = false)
 	{
@@ -206,6 +208,14 @@ class Character extends FlxSprite
 		originalFlipX = (json.flip_x == true);
 		editorIsPlayer = json._editor_isPlayer;
 
+		// LOCAL ENGINE: поля редактора персонажей
+		vSliceSustains = (json.vslice_sustains == true);
+		scalableOffsets = (json.scalableOffsets == true);
+		gameoverCharacter = json.gameover_character;
+		gameoverInitialDeathSound = json.gameover_initial_sound;
+		gameoverLoopDeathSound = json.gameover_loop_sound;
+		gameoverConfirmDeathSound = json.gameover_confirm_sound;
+
 		// antialiasing
 		noAntialiasing = (json.no_antialiasing == true);
 		antialiasing = ClientPrefs.data.antialiasing ? !noAntialiasing : false;
@@ -309,68 +319,24 @@ class Character extends FlxSprite
 			holdTimer = 0;
 		}
 
-		// LOCAL ENGINE: hold_type логика
-		if (curAnimName.startsWith('sing') && !curAnimName.endsWith('miss'))
+		if (vSliceSustains && curAnimName.startsWith('sing') && !curAnimName.endsWith('miss'))
 		{
-			var animData = getAnimData(curAnimName);
-			if (animData != null)
+			if (!isAnimateAtlas && animation.curAnim != null && animation.curAnim.finished)
 			{
-				var ht = animData.hold_type;
-				if (ht == 'static')
-				{
-					// LOCAL ENGINE: зависаем на hold_static_frame пока нота зажата
-					if (!isAnimateAtlas && animation.curAnim != null)
-					{
-						var targetFrame:Int = animData.hold_static_frame ?? (animation.curAnim.frames.length - 1);
-						// Когда дошли до нужного кадра — фиксируем через finished
-						if (animation.curAnim.curFrame >= targetFrame || animation.curAnim.finished)
-						{
-							animation.curAnim.curFrame = targetFrame;
-						}
-					}
-				}
-				else if (ht == 'loop2frame')
-				{
-					// LOCAL ENGINE: циклим между двумя кадрами пока нота зажата
-					if (!isAnimateAtlas && animation.curAnim != null)
-					{
-						var loopStart:Int = animData.hold_loop_start ?? 0;
-						var loopEnd:Int   = animData.hold_loop_end   ?? 1;
-						if (loopEnd >= animation.curAnim.frames.length)
-							loopEnd = animation.curAnim.frames.length - 1;
-						if (animation.curAnim.curFrame >= loopEnd || animation.curAnim.finished)
-						{
-							animation.curAnim.curFrame = loopStart;
-						}
-					}
-				}
+				animation.curAnim.curFrame = animation.curAnim.frames.length - 1;
+			}
+			else if (isAnimateAtlas && atlas.anim.finished)
+			{
+				atlas.anim.curFrame = atlas.anim.length - 1;
 			}
 		}
-		// Когда нота отпустилась — воспроизводим hold_end_anim если задана
-		var wasHolding = _holdActive;
-		_holdActive = curAnimName.startsWith('sing') && !curAnimName.endsWith('miss');
-		if (wasHolding && !_holdActive && _holdAnimName.length > 0)
-		{
-			var prevData = getAnimData(_holdAnimName);
-			if (prevData != null && prevData.hold_end_anim != null && animOffsets.exists(prevData.hold_end_anim))
-			{
-				playAnim(prevData.hold_end_anim, true);
-				specialAnim = true;
-			}
-		}
-		_holdAnimName = _holdActive ? curAnimName : '';
 
-		// стандартный -loop суффикс (оригинальный Psych)
 		if(isAnimationFinished() && animOffsets.exists('$curAnimName-loop'))
 			playAnim('$curAnimName-loop');
 
 		super.update(elapsed);
 	}
 
-	/**
-	 * LOCAL ENGINE: получить AnimArray данные текущей анимации.
-	 * Используется для hold_type логики.
-	 */
 	public function getAnimData(?animName:String):Null<AnimArray>
 	{
 		var name = animName != null ? animName : getAnimationName();
