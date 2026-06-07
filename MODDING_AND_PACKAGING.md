@@ -10,7 +10,7 @@ Supported layouts:
 content/Mod.zip
   characters/bf.json
   images/characters/BOYFRIEND.png
-  songs/tutorial/Inst.ogg
+  songs/tutorial/audio/Inst.ogg
 ```
 
 ```text
@@ -18,14 +18,14 @@ content/Mod.zip
   Mod/
     characters/bf.json
     images/characters/BOYFRIEND.png
-    songs/tutorial/Inst.ogg
+    songs/tutorial/audio/Inst.ogg
 ```
 
 ```text
 content/Mod.zip
   assets/shared/characters/bf.json
   assets/shared/images/characters/BOYFRIEND.png
-  assets/songs/tutorial/Inst.ogg
+  assets/songs/tutorial/audio/Inst.ogg
 ```
 
 ```text
@@ -39,10 +39,8 @@ The engine scans zip files automatically. You do not have to add them to `modsLi
 Audio lookup checks `.opus`, `.ogg`, then `.mp3`. Songs inside zip can use:
 
 ```text
-songs/song-name/Inst.ogg
-songs/song-name/Voices.ogg
-assets/songs/song-name/Inst.ogg
-assets/songs/song-name/Voices.ogg
+assets/songs/song-name/audio/Inst.ogg
+assets/songs/song-name/audio/Voices.ogg
 ```
 
 ## Asset Zip Packs
@@ -52,7 +50,7 @@ Zip files under `assets/` are treated as asset packs. This is useful when you wa
 ```text
 assets/base-assets.zip
   shared/images/menuDesat.png
-  songs/tutorial/Inst.ogg
+  songs/tutorial/audio/Inst.ogg
 ```
 
 or:
@@ -60,7 +58,7 @@ or:
 ```text
 assets/base-assets.zip
   assets/shared/images/menuDesat.png
-  assets/songs/tutorial/Inst.ogg
+  assets/songs/tutorial/audio/Inst.ogg
 ```
 
 ## Chart Compatibility
@@ -75,8 +73,8 @@ Supported chart loaders:
 For Codename charts, optional metadata can be placed at:
 
 ```text
-songs/song/meta.json
-data/song/meta.json
+songs/song/chart/meta.json
+data/song/chart/meta.json
 ```
 
 ## Startup State
