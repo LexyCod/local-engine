@@ -60,6 +60,7 @@
 	<!-- HL target defines -->
 	<define name="MODS_ALLOWED" if="desktop hl" />
 	<define name="HSCRIPT_ALLOWED" if="desktop hl" />
+	
 
 	<!-- _____________________________ Path Settings ____________________________ -->
 

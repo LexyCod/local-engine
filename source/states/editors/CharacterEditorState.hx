@@ -85,6 +85,33 @@ class CharacterEditorState extends MusicBeatState
 	var dragOffsetX:Float = 0;
 	var dragOffsetY:Float = 0;
 
+	var winSettings:VBox;
+	var winCharacter:VBox;
+	var uiBox:TabView;
+	var panelColor:VBox;
+	var previewBox:Component;
+	
+	var chkPlayer:CheckBox;
+	var txtImage:TextField;
+	var txtHealthIcon:TextField;
+	var txtVocals:TextField;
+	var chkFlipX:CheckBox;
+	var chkNoAntialiasing:CheckBox;
+	var txtScale:TextField;
+	var chkVsliceSustains:CheckBox;
+	var sldSingDuration:Slider;
+	var txtGameoverChar:TextField;
+	var txtGameoverInit:TextField;
+	var txtGameoverLoop:TextField;
+	var txtGameoverConfirm:TextField;
+
+	var txtAnim:TextField;
+	var txtAnimName:TextField;
+	var txtIndices:TextField;
+	var chkAnimLoop:CheckBox;
+	var chkAnimFlipX:CheckBox;
+	var chkAnimFlipY:CheckBox;
+
 	public function new(char:String = null, goToPlayState:Bool = true)
 	{
 		this._char = char;
@@ -97,8 +124,6 @@ class CharacterEditorState extends MusicBeatState
 	{
 		@:privateAccess haxe.ui.backend.flixel.CursorHelper.mouseLoadFunction = function(id:String) { return null; };
 		if(ClientPrefs.data.cacheOnGPU) Paths.clearStoredMemory();
-
-		FlxG.mouse.visible = true;
 
 		FlxG.sound.music.stop();
 		camEditor = initPsychCamera();
@@ -113,7 +138,7 @@ class CharacterEditorState extends MusicBeatState
 
 		Toolkit.init();
 		haxe.ui.Toolkit.theme = "dark";
-
+		FlxG.mouse.visible = true;
 		loadBG();
 		silhouettes = new FlxSpriteGroup();
 		add(silhouettes);
@@ -143,14 +168,40 @@ class CharacterEditorState extends MusicBeatState
 		uiRoot.cameras = [camMenu]; 
 		add(uiRoot);
 
+		winSettings = uiRoot.findComponent("windowSettings", VBox);
+		winCharacter = uiRoot.findComponent("windowCharacter", VBox);
+		uiBox = uiRoot.findComponent("uiBox", TabView);
+		panelColor = uiRoot.findComponent("colorPickerPanel", VBox);
+		previewBox = uiRoot.findComponent("colorPreview", Component);
+		listAnimations = uiRoot.findComponent("listAnimations", ListView);
+
+		chkPlayer = uiRoot.findComponent("chkPlayer", CheckBox);
+		txtImage = uiRoot.findComponent("txtImage", TextField);
+		txtHealthIcon = uiRoot.findComponent("txtHealthIcon", TextField);
+		txtVocals = uiRoot.findComponent("txtVocals", TextField);
+		chkFlipX = uiRoot.findComponent("chkFlipX", CheckBox);
+		chkNoAntialiasing = uiRoot.findComponent("chkNoAntialiasing", CheckBox);
+		txtScale = uiRoot.findComponent("txtScale", TextField);
+		chkVsliceSustains = uiRoot.findComponent("chkVsliceSustains", CheckBox);
+		sldSingDuration = uiRoot.findComponent("sldSingDuration", Slider);
+		txtGameoverChar = uiRoot.findComponent("txtGameoverChar", TextField);
+		txtGameoverInit = uiRoot.findComponent("txtGameoverInit", TextField);
+		txtGameoverLoop = uiRoot.findComponent("txtGameoverLoop", TextField);
+		txtGameoverConfirm = uiRoot.findComponent("txtGameoverConfirm", TextField);
+
+		txtAnim = uiRoot.findComponent("txtAnim", TextField);
+		txtAnimName = uiRoot.findComponent("txtAnimName", TextField);
+		txtIndices = uiRoot.findComponent("txtIndices", TextField);
+		chkAnimLoop = uiRoot.findComponent("chkAnimLoop", CheckBox);
+		chkAnimFlipX = uiRoot.findComponent("chkAnimFlipX", CheckBox);
+		chkAnimFlipY = uiRoot.findComponent("chkAnimFlipY", CheckBox);
+
 		colorWheel = new FlxSprite().loadGraphic(Paths.image('noteColorMenu/colorWheel'));
 		colorWheel.setGraphicSize(120, 120);
 		colorWheel.updateHitbox();
 		colorWheel.visible = false;
 		colorWheel.cameras = [camMenu];
 		add(colorWheel);
-
-		listAnimations = uiRoot.findComponent("listAnimations", ListView);
 
 		addCharacter();
 		setupDragAndDrop();
@@ -217,39 +268,38 @@ class CharacterEditorState extends MusicBeatState
 	function setupDragAndDrop()
 	{
 		var dragSettings = uiRoot.findComponent("dragSettings", HBox);
-		var winSettings = uiRoot.findComponent("windowSettings", VBox);
-		
 		var dragCharacter = uiRoot.findComponent("dragCharacter", HBox);
-		var winCharacter = uiRoot.findComponent("windowCharacter", VBox);
-		
 		var dragColorPicker = uiRoot.findComponent("dragColorPicker", HBox);
-		var colorPickerPanel = uiRoot.findComponent("colorPickerPanel", VBox);
-
-		if(dragSettings != null && winSettings != null) {
-			dragSettings.registerEvent(haxe.ui.events.MouseEvent.MOUSE_DOWN, function(e) {
-				dragTarget = winSettings;
-				dragOffsetX = FlxG.mouse.screenX - winSettings.left;
-				dragOffsetY = FlxG.mouse.screenY - winSettings.top;
-			});
-		}
-		if(dragCharacter != null && winCharacter != null) {
-			dragCharacter.registerEvent(haxe.ui.events.MouseEvent.MOUSE_DOWN, function(e) {
-				dragTarget = winCharacter;
-				dragOffsetX = FlxG.mouse.screenX - winCharacter.left;
-				dragOffsetY = FlxG.mouse.screenY - winCharacter.top;
-			});
-		}
-		if(dragColorPicker != null && colorPickerPanel != null) {
-			dragColorPicker.registerEvent(haxe.ui.events.MouseEvent.MOUSE_DOWN, function(e) {
-				dragTarget = colorPickerPanel;
-				dragOffsetX = FlxG.mouse.screenX - colorPickerPanel.left;
-				dragOffsetY = FlxG.mouse.screenY - colorPickerPanel.top;
+		
+		function makeDraggable(dragHandle:Component, targetPanel:Component) {
+			if (dragHandle == null || targetPanel == null) return;
+			
+			dragHandle.registerEvent(haxe.ui.events.MouseEvent.MOUSE_DOWN, function(e:haxe.ui.events.MouseEvent) {
+				dragTarget = targetPanel;
+				dragOffsetX = e.screenX - targetPanel.left;
+				dragOffsetY = e.screenY - targetPanel.top;
+				
+				haxe.ui.core.Screen.instance.registerEvent(haxe.ui.events.MouseEvent.MOUSE_MOVE, onGlobalMouseMove);
+				haxe.ui.core.Screen.instance.registerEvent(haxe.ui.events.MouseEvent.MOUSE_UP, onGlobalMouseUp);
 			});
 		}
 
-		uiRoot.registerEvent(haxe.ui.events.MouseEvent.MOUSE_UP, function(e) {
-			dragTarget = null;
-		});
+		makeDraggable(dragSettings, winSettings);
+		makeDraggable(dragCharacter, winCharacter);
+		makeDraggable(dragColorPicker, panelColor);
+	}
+
+	function onGlobalMouseMove(e:haxe.ui.events.MouseEvent) {
+		if (dragTarget != null) {
+			dragTarget.left = e.screenX - dragOffsetX;
+			dragTarget.top = e.screenY - dragOffsetY;
+		}
+	}
+
+	function onGlobalMouseUp(e:haxe.ui.events.MouseEvent) {
+		dragTarget = null;
+		haxe.ui.core.Screen.instance.unregisterEvent(haxe.ui.events.MouseEvent.MOUSE_MOVE, onGlobalMouseMove);
+		haxe.ui.core.Screen.instance.unregisterEvent(haxe.ui.events.MouseEvent.MOUSE_UP, onGlobalMouseUp);
 	}
 
 	function addCharacter(reload:Bool = false)
@@ -292,41 +342,21 @@ class CharacterEditorState extends MusicBeatState
 	{
 		if(uiRoot == null || character == null) return;
 		
-		var chkPlayer = uiRoot.findComponent("chkPlayer", CheckBox);
 		if(chkPlayer != null) chkPlayer.selected = character.isPlayer;
-
-		var txtImage = uiRoot.findComponent("txtImage", TextField);
 		if(txtImage != null) txtImage.text = character.imageFile;
-		var txtHealthIcon = uiRoot.findComponent("txtHealthIcon", TextField);
 		if(txtHealthIcon != null) txtHealthIcon.text = character.healthIcon;
-		
-		var txtVocals = uiRoot.findComponent("txtVocals", TextField);
 		if(txtVocals != null) txtVocals.text = character.vocalsFile;
-
-		var chkFlipX = uiRoot.findComponent("chkFlipX", CheckBox);
 		if(chkFlipX != null) chkFlipX.selected = character.originalFlipX;
-		var chkNoAntialiasing = uiRoot.findComponent("chkNoAntialiasing", CheckBox);
 		if(chkNoAntialiasing != null) chkNoAntialiasing.selected = character.noAntialiasing;
 
-		var txtScale = uiRoot.findComponent("txtScale", TextField);
 		if(txtScale != null) txtScale.text = Std.string(character.jsonScale);
-
-		var chkVsliceSustains = uiRoot.findComponent("chkVsliceSustains", CheckBox);
 		if(chkVsliceSustains != null) chkVsliceSustains.selected = character.vSliceSustains;
 
-		var sldSingDuration = uiRoot.findComponent("sldSingDuration", Slider);
 		if(sldSingDuration != null) sldSingDuration.pos = character.singDuration;
 
-		var txtGameoverChar = uiRoot.findComponent("txtGameoverChar", TextField);
 		if(txtGameoverChar != null) txtGameoverChar.text = character.gameoverCharacter != null ? character.gameoverCharacter : "";
-
-		var txtGameoverInit = uiRoot.findComponent("txtGameoverInit", TextField);
 		if(txtGameoverInit != null) txtGameoverInit.text = character.gameoverInitialDeathSound != null ? character.gameoverInitialDeathSound : "";
-
-		var txtGameoverLoop = uiRoot.findComponent("txtGameoverLoop", TextField);
 		if(txtGameoverLoop != null) txtGameoverLoop.text = character.gameoverLoopDeathSound != null ? character.gameoverLoopDeathSound : "";
-
-		var txtGameoverConfirm = uiRoot.findComponent("txtGameoverConfirm", TextField);
 		if(txtGameoverConfirm != null) txtGameoverConfirm.text = character.gameoverConfirmDeathSound != null ? character.gameoverConfirmDeathSound : "";
 		
 		updateUIIconScale();
@@ -334,7 +364,22 @@ class CharacterEditorState extends MusicBeatState
 
 	function bindHaxeUI()
 	{
-		var chkPlayer = uiRoot.findComponent("chkPlayer", CheckBox);
+		var dropCharacter = uiRoot.findComponent("dropCharacter", DropDown);
+		if (dropCharacter != null) {
+			dropCharacter.onChange = function(e) {
+				if (dropCharacter.selectedIndex < 0 || characterList == null || dropCharacter.selectedIndex >= characterList.length) return;
+				
+				var selectedChar = characterList[dropCharacter.selectedIndex];
+				
+				if (selectedChar != null && selectedChar != "" && selectedChar != _char) {
+					_char = selectedChar;
+					addCharacter();
+					updateUIFields();
+					updatePointerPos(true);
+				}
+			};
+		}
+
 		if(chkPlayer != null) {
 			chkPlayer.onChange = function(e) {
 				character.isPlayer = chkPlayer.selected;
@@ -344,7 +389,6 @@ class CharacterEditorState extends MusicBeatState
 			};
 		}
 
-		var txtImage = uiRoot.findComponent("txtImage", TextField);
 		if(txtImage != null) {
 			txtImage.onChange = function(e) { character.imageFile = txtImage.text; };
 		}
@@ -355,7 +399,6 @@ class CharacterEditorState extends MusicBeatState
 		if(btnReloadImage != null) btnReloadImage.onClick = reloadFunc;
 		if(btnReloadChar != null) btnReloadChar.onClick = reloadFunc;
 
-		var txtHealthIcon = uiRoot.findComponent("txtHealthIcon", TextField);
 		if(txtHealthIcon != null) {
 			txtHealthIcon.onChange = function(e) {
 				character.healthIcon = txtHealthIcon.text;
@@ -385,7 +428,6 @@ class CharacterEditorState extends MusicBeatState
 			};
 		}
 
-		var panelColor = uiRoot.findComponent("colorPickerPanel", VBox);
 		var btnGetIconColor = uiRoot.findComponent("btnGetIconColor", Button);
 		var btnApplyColor = uiRoot.findComponent("btnApplyColor", Button);
 		var btnCancelColor = uiRoot.findComponent("btnCancelColor", Button);
@@ -393,8 +435,10 @@ class CharacterEditorState extends MusicBeatState
 		if(btnGetIconColor != null && panelColor != null) {
 			btnGetIconColor.onClick = function(e) {
 				panelColor.hidden = false;
-				panelColor.left = FlxG.mouse.screenX - 50;
-				panelColor.top = FlxG.mouse.screenY - 50;
+				
+				panelColor.left = (haxe.ui.core.Screen.instance.width - panelColor.width) / 2;
+				panelColor.top = (haxe.ui.core.Screen.instance.height - panelColor.height) / 2;
+				
 				colorWheel.visible = true;
 				isSelectingColor = true;
 			};
@@ -419,42 +463,34 @@ class CharacterEditorState extends MusicBeatState
 			};
 		}
 
-		var chkVsliceSustains = uiRoot.findComponent("chkVsliceSustains", CheckBox);
 		if(chkVsliceSustains != null) {
 			chkVsliceSustains.onChange = function(e) { character.vSliceSustains = chkVsliceSustains.selected; };
 		}
 
-		var sldSingDuration = uiRoot.findComponent("sldSingDuration", Slider);
 		if(sldSingDuration != null) {
 			sldSingDuration.onChange = function(e) { character.singDuration = sldSingDuration.pos; };
 		}
 
-		var txtGameoverChar = uiRoot.findComponent("txtGameoverChar", TextField);
 		if(txtGameoverChar != null) {
 			txtGameoverChar.onChange = function(e) { character.gameoverCharacter = txtGameoverChar.text; };
 		}
 
-		var txtGameoverInit = uiRoot.findComponent("txtGameoverInit", TextField);
 		if(txtGameoverInit != null) {
 			txtGameoverInit.onChange = function(e) { character.gameoverInitialDeathSound = txtGameoverInit.text; };
 		}
 
-		var txtGameoverLoop = uiRoot.findComponent("txtGameoverLoop", TextField);
 		if(txtGameoverLoop != null) {
 			txtGameoverLoop.onChange = function(e) { character.gameoverLoopDeathSound = txtGameoverLoop.text; };
 		}
 
-		var txtGameoverConfirm = uiRoot.findComponent("txtGameoverConfirm", TextField);
 		if(txtGameoverConfirm != null) {
 			txtGameoverConfirm.onChange = function(e) { character.gameoverConfirmDeathSound = txtGameoverConfirm.text; };
 		}
 
-		var txtVocals = uiRoot.findComponent("txtVocals", TextField);
 		if(txtVocals != null) {
 			txtVocals.onChange = function(e) { character.vocalsFile = txtVocals.text; };
 		}
 
-		var chkFlipX = uiRoot.findComponent("chkFlipX", CheckBox);
 		if(chkFlipX != null) {
 			chkFlipX.onChange = function(e) {
 				character.originalFlipX = chkFlipX.selected;
@@ -462,7 +498,6 @@ class CharacterEditorState extends MusicBeatState
 			};
 		}
 
-		var chkNoAntialiasing = uiRoot.findComponent("chkNoAntialiasing", CheckBox);
 		if(chkNoAntialiasing != null) {
 			chkNoAntialiasing.onChange = function(e) {
 				character.noAntialiasing = chkNoAntialiasing.selected;
@@ -470,7 +505,6 @@ class CharacterEditorState extends MusicBeatState
 			};
 		}
 
-		var txtScale = uiRoot.findComponent("txtScale", TextField);
 		if(txtScale != null) {
 			txtScale.onChange = function(e) {
 				var val = Std.parseFloat(txtScale.text);
@@ -500,7 +534,6 @@ class CharacterEditorState extends MusicBeatState
 			}
 		}
 
-		var chkAnimFlipX = uiRoot.findComponent("chkAnimFlipX", CheckBox);
 		if(chkAnimFlipX != null) {
 			chkAnimFlipX.onChange = function(e) {
 				if(anims != null && anims[curAnim] != null) {
@@ -510,7 +543,6 @@ class CharacterEditorState extends MusicBeatState
 			};
 		}
 
-		var chkAnimFlipY = uiRoot.findComponent("chkAnimFlipY", CheckBox);
 		if(chkAnimFlipY != null) {
 			chkAnimFlipY.onChange = function(e) {
 				if(anims != null && anims[curAnim] != null) {
@@ -520,7 +552,6 @@ class CharacterEditorState extends MusicBeatState
 			};
 		}
 
-		var chkAnimLoop = uiRoot.findComponent("chkAnimLoop", CheckBox);
 		if(chkAnimLoop != null) {
 			chkAnimLoop.onChange = function(e) {
 				if(anims != null && anims[curAnim] != null) {
@@ -533,10 +564,6 @@ class CharacterEditorState extends MusicBeatState
 		var btnAddAnim = uiRoot.findComponent("btnAddAnim", Button);
 		if(btnAddAnim != null) {
 			btnAddAnim.onClick = function(e) {
-				var txtAnim = uiRoot.findComponent("txtAnim", TextField);
-				var txtAnimName = uiRoot.findComponent("txtAnimName", TextField);
-				var txtIndices = uiRoot.findComponent("txtIndices", TextField);
-				
 				if(txtAnim == null || txtAnim.text.trim() == "" || txtAnimName == null || txtAnimName.text.trim() == "") {
 					showNotif("Anim Name and Symbol cannot be empty!", FlxColor.RED);
 					return;
@@ -638,12 +665,6 @@ class CharacterEditorState extends MusicBeatState
 		if (uiRoot == null || anims == null || anims[curAnim] == null) return;
 		var anim = anims[curAnim];
 		
-		var txtAnim = uiRoot.findComponent("txtAnim", TextField);
-		var txtAnimName = uiRoot.findComponent("txtAnimName", TextField);
-		var chkAnimLoop = uiRoot.findComponent("chkAnimLoop", CheckBox);
-		var chkAnimFlipX = uiRoot.findComponent("chkAnimFlipX", CheckBox);
-		var chkAnimFlipY = uiRoot.findComponent("chkAnimFlipY", CheckBox);
-		var txtIndices = uiRoot.findComponent("txtIndices", TextField);
 		if(txtAnim != null) txtAnim.text = anim.anim;
 		if(txtAnimName != null) txtAnimName.text = anim.name;
 		if(chkAnimLoop != null) chkAnimLoop.selected = (anim.loop == true);
@@ -670,29 +691,18 @@ class CharacterEditorState extends MusicBeatState
 	var holdingArrowsElapsed:Float = 0;
 	var holdingFrameTime:Float = 0;
 	var holdingFrameElapsed:Float = 0;
-	
 	override function update(elapsed:Float)
 	{
-		if(dragTarget != null) {
-			dragTarget.left = FlxG.mouse.screenX - dragOffsetX;
-			dragTarget.top = FlxG.mouse.screenY - dragOffsetY;
-		}
-
-		var winSettings = uiRoot.findComponent("windowSettings", VBox);
 		if(winSettings != null && uiIcon != null) {
 			uiIcon.x = winSettings.left + 155;
-			uiIcon.y = winSettings.top + 260; 
+			uiIcon.y = winSettings.top + 260;
 		}
 
-		var uiBox = uiRoot.findComponent("uiBox", TabView);
 		if (uiBox != null && uiIcon != null) {
 			uiIcon.visible = (uiBox.pageIndex == 0);
 		}
 
 		if(isSelectingColor) {
-			var panelColor = uiRoot.findComponent("colorPickerPanel", VBox);
-			var previewBox = uiRoot.findComponent("colorPreview", Component);
-			
 			if (panelColor != null) {
 				colorWheel.x = panelColor.left + (panelColor.width - colorWheel.width) / 2;
 				colorWheel.y = panelColor.top + 35;
@@ -717,7 +727,6 @@ class CharacterEditorState extends MusicBeatState
 		}
 
 		super.update(elapsed);
-
 		if(notifText.visible)
 		{
 			notifTimer -= elapsed;
@@ -756,6 +765,7 @@ class CharacterEditorState extends MusicBeatState
 		}
 		if(lastZoom != FlxG.camera.zoom)
 			cameraZoomText.text = 'Camera Zoom: ' + FlxMath.roundDecimal(FlxG.camera.zoom, 2) + 'x';
+
 		var changedAnim:Bool = false;
 		if(anims != null && anims.length > 1)
 		{
@@ -926,7 +936,7 @@ class CharacterEditorState extends MusicBeatState
 	inline function updatePointerPos(?snap:Bool = true) {
 		if(character == null) return;
 		var offX = !character.isPlayer ?
-		character.getMidpoint().x + 150 + character.cameraPosition[0] : character.getMidpoint().x - 100 - character.cameraPosition[0];
+			character.getMidpoint().x + 150 + character.cameraPosition[0] : character.getMidpoint().x - 100 - character.cameraPosition[0];
 		var offY = character.getMidpoint().y - 100 + character.cameraPosition[1];
 		cameraFollowPointer.setPosition(offX, offY);
 		if(snap) {
@@ -974,7 +984,7 @@ class CharacterEditorState extends MusicBeatState
 
 	inline function predictCharacterIsNotPlayer(name:String) {
 		return (name != 'bf' && !name.startsWith('bf-') && !name.endsWith('-player') && !name.endsWith('-dead')) || name.endsWith('-opponent') ||
-		name.startsWith('gf-') || name.endsWith('-gf') || name == 'gf';
+			name.startsWith('gf-') || name.endsWith('-gf') || name == 'gf';
 	}
 
 	var characterList:Array<String> = [];
