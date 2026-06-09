@@ -7,7 +7,6 @@ import objects.Character;
 import states.MainMenuState;
 import states.FreeplayState;
 
-
 #if (debug || dev)
 import debug.DebugJSONState;
 #end
@@ -125,8 +124,10 @@ class MasterEditorMenu extends MusicBeatState
 					LoadingState.loadAndSwitchState(new DialogueCharacterEditorState(), false);
 				case 'Note Splash Debug':
 					MusicBeatState.switchState(new NoteSplashDebugState());
+				#if (debug || dev)
 				case 'JSON State':
 					FlxG.switchState(new DebugJSONState());
+				#end
 				case 'Chart Converter':
 					MusicBeatState.switchState(new ChartConverterState());
 			}

@@ -60,12 +60,11 @@
 	<!-- HL target defines -->
 	<define name="MODS_ALLOWED" if="desktop hl" />
 	<define name="HSCRIPT_ALLOWED" if="desktop hl" />
-	
 
 	<!-- _____________________________ Path Settings ____________________________ -->
 
 	<set name="BUILD_DIR" value="export/debug"   if="debug" />
-	<set name="BUILD_DIR" value="export/release"  unless="debug || DEV_BUILD" />
+	<set name="BUILD_DIR" value="export/release"  unless="debug || DEV_BUILD || dev" />
 	<set name="BUILD_DIR" value="export/dev"      if="DEV_BUILD" unless="debug" />
 	<set name="BUILD_DIR" value="export/32bit"    if="32bits" />
 	<set name="BUILD_DIR" value="export/hl-debug" if="hl debug" />
@@ -143,9 +142,7 @@
 	</section>
 
 	<section if="RELEASE_BUILD cpp">
-		<haxedef name="HXCPP_STRICT_CASTS" />
-		<haxeflag name="-dce" value="full" />
-		<haxeflag name="--no-traces" />
+    		<haxedef name="HXCPP_STRICT_CASTS" />
 	</section>
 
 	<haxedef name="HXC_LIBVLC_LOGGING" if="VIDEOS_ALLOWED debug" />

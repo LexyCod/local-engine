@@ -55,6 +55,11 @@ class CharacterEditorState extends MusicBeatState
 	var frameAdvanceText:FlxText;
 	var notifText:FlxText;
 
+	var txtCharOffsetX:TextField;
+	var txtCharOffsetY:TextField;
+	var txtCamOffsetX:TextField;
+	var txtCamOffsetY:TextField;
+
 	var healthBar:Bar;
 	var healthIcon:HealthIcon;
 	var uiIcon:HealthIcon; 
@@ -305,16 +310,39 @@ class CharacterEditorState extends MusicBeatState
 	function addCharacter(reload:Bool = false)
 	{
 		var pos:Int = -1;
+		var isPlayer:Bool = !predictCharacterIsNotPlayer(_char);
+
 		if(character != null)
 		{
 			pos = members.indexOf(character);
+			
+			if(reload) isPlayer = character.isPlayer;
+
+			if(reload && character.imageFile != null)
+			{
+				var graphic:flixel.graphics.FlxGraphic = Paths.image(character.imageFile);
+				if(graphic != null) FlxG.bitmap.remove(graphic);
+			}
+
 			remove(character);
 			character.destroy();
 		}
 
-		var isPlayer = (reload ? character.isPlayer : !predictCharacterIsNotPlayer(_char));
 		try {
 			character = new Character(0, 0, _char, isPlayer);
+			
+			if(reload && txtImage != null && txtImage.text != null && txtImage.text != "")
+			{
+				var newImage:String = txtImage.text;
+				var newGraphic:flixel.graphics.FlxGraphic = Paths.image(newImage);
+				if(newGraphic != null) FlxG.bitmap.remove(newGraphic);
+				
+				if(character.imageFile != newImage)
+				{
+					character.imageFile = newImage;
+					character.frames = Paths.getSparrowAtlas(character.imageFile);
+				}
+			}
 		} catch(e:Dynamic) {
 			character = new Character(0, 0, Character.DEFAULT_CHARACTER, isPlayer);
 			showNotif('Error loading character: $_char', FlxColor.RED);
@@ -327,6 +355,8 @@ class CharacterEditorState extends MusicBeatState
 		updateCharacterPositions();
 		reloadAnimList();
 		if(healthBar != null && healthIcon != null) updateHealthBar();
+		
+		if(reload) updateUIFields(); 
 	}
 
 	inline function updateUIIconScale()
@@ -358,6 +388,11 @@ class CharacterEditorState extends MusicBeatState
 		if(txtGameoverInit != null) txtGameoverInit.text = character.gameoverInitialDeathSound != null ? character.gameoverInitialDeathSound : "";
 		if(txtGameoverLoop != null) txtGameoverLoop.text = character.gameoverLoopDeathSound != null ? character.gameoverLoopDeathSound : "";
 		if(txtGameoverConfirm != null) txtGameoverConfirm.text = character.gameoverConfirmDeathSound != null ? character.gameoverConfirmDeathSound : "";
+
+		if(txtCharOffsetX != null) txtCharOffsetX.text = Std.string(character.positionArray[0]);
+		if(txtCharOffsetY != null) txtCharOffsetY.text = Std.string(character.positionArray[1]);
+		if(txtCamOffsetX != null) txtCamOffsetX.text = Std.string(character.cameraPosition[0]);
+		if(txtCamOffsetY != null) txtCamOffsetY.text = Std.string(character.cameraPosition[1]);
 		
 		updateUIIconScale();
 	}
@@ -515,6 +550,39 @@ class CharacterEditorState extends MusicBeatState
 				}
 			};
 		}
+
+		txtCharOffsetX = uiRoot.findComponent("txtCharOffsetX", TextField);
+		txtCharOffsetY = uiRoot.findComponent("txtCharOffsetY", TextField);
+		txtCamOffsetX = uiRoot.findComponent("txtCamOffsetX", TextField);
+		txtCamOffsetY = uiRoot.findComponent("txtCamOffsetY", TextField);
+
+		txtCharOffsetX.onChange = function(e) {
+			var val = Std.parseFloat(txtCharOffsetX.text);
+			if (!Math.isNaN(val) && character != null) {
+				character.positionArray[0] = val;
+				updateCharacterPositions();
+			}
+		};
+		txtCharOffsetY.onChange = function(e) {
+			var val = Std.parseFloat(txtCharOffsetY.text);
+			if (!Math.isNaN(val) && character != null) {
+				character.positionArray[1] = val;
+				updateCharacterPositions();
+			}
+		};
+		
+		txtCamOffsetX.onChange = function(e) {
+			var val = Std.parseFloat(txtCamOffsetX.text);
+			if (!Math.isNaN(val) && character != null) {
+				character.cameraPosition[0] = val;
+			}
+		};
+		txtCamOffsetY.onChange = function(e) {
+			var val = Std.parseFloat(txtCamOffsetY.text);
+			if (!Math.isNaN(val) && character != null) {
+				character.cameraPosition[1] = val;
+			}
+		};
 
 		if (listAnimations != null) {
 			listAnimations.onChange = function(e) {

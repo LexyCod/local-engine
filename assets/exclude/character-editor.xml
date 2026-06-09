@@ -68,6 +68,31 @@
                 
                 <button id="btnSaveCharacter" text="Save Character" width="100%" style="margin-top: 8px; color: #77FF77;" />
             </vbox>
+	    <vbox text="Offsets" style="padding: 10px; spacing: 10px;" width="100%" height="100%">
+                <label text="Character Position" style="color: #FFFFFF; font-weight: bold; margin-bottom: 5px;" />
+                <hbox width="100%" style="spacing: 10px;">
+                    <vbox width="50%">
+                        <label text="Global X:" />
+                        <textfield id="txtCharOffsetX" text="0" width="100%" />
+                    </vbox>
+                    <vbox width="50%">
+                        <label text="Global Y:" />
+                        <textfield id="txtCharOffsetY" text="0" width="100%" />
+                    </vbox>
+                </hbox>
+                
+                <label text="Camera Position" style="color: #FFFFFF; font-weight: bold; margin-top: 15px; margin-bottom: 5px;" />
+                <hbox width="100%" style="spacing: 10px;">
+                    <vbox width="50%">
+                        <label text="Camera X:" />
+                        <textfield id="txtCamOffsetX" text="0" width="100%" />
+                    </vbox>
+                    <vbox width="50%">
+                        <label text="Camera Y:" />
+                        <textfield id="txtCamOffsetY" text="0" width="100%" />
+                    </vbox>
+                </hbox>
+            </vbox>
 	    <vbox text="Extra" style="padding: 10px; spacing: 8px;" width="100%" height="100%">
                 
                 <checkbox id="chkVsliceSustains" text="vSlice Sustains" />
