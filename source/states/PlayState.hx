@@ -496,10 +496,10 @@ class PlayState extends MusicBeatState
 		Conductor.songPosition = -5000 / Conductor.songPosition;
 		var showTime:Bool = (ClientPrefs.data.timeBarType != 'Disabled');
 		var barThickness:Int = 6;
-
+		var barY:Float = ClientPrefs.data.downScroll ? FlxG.height - barThickness : 0;
+		
 		var timeBarNew:MinimalTimeBar = new MinimalTimeBar();
-		timeBarNew.cameras = [camOther];
-		//add(timeBarNew);
+		add(timeBarNew);
 		
 		strumLineNotes = new FlxTypedGroup<StrumNote>();
 		noteGroup.add(strumLineNotes);

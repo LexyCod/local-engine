@@ -71,8 +71,6 @@ class Main extends Sprite
 		Sys.setCwd(lime.system.System.applicationStorageDirectory);
 		#end
 
-		initHaxeUI();
-
 		if (stage != null)
 		{
 			init();
@@ -110,6 +108,7 @@ class Main extends Sprite
 		#else
 		game.zoom = 1;
 		#end
+
 
 		#if LUA_ALLOWED Lua.set_callbacks_function(cpp.Callable.fromStaticFunction(psychlua.CallbackHandler.call)); #end
 		Controls.instance = new Controls();
@@ -221,12 +220,4 @@ class Main extends Sprite
 		Sys.exit(1);
 	}
 	#end
-	function initHaxeUI():Void
-	{
-		haxe.ui.Toolkit.init();
-		haxe.ui.Toolkit.theme = 'dark';
-		haxe.ui.Toolkit.autoScale = false;
-		haxe.ui.focus.FocusManager.instance.autoFocus = false;
-		haxe.ui.tooltips.ToolTipManager.defaultDelay = 200;
-	}
 }
