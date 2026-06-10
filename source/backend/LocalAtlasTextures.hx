@@ -4,6 +4,11 @@ import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.graphics.frames.FlxAtlasFrames;
 
+#if sys
+import sys.FileSystem;
+import sys.io.File;
+#end
+
 #if flxanimate
 import flxanimate.FlxAnimate;
 #end
@@ -59,7 +64,6 @@ class LocalAtlasTextures
 		trace('[LocalAtlasTextures] init');
 		#end
 	}
-
 
 	public static function getSparrow(path:String, ?group:String):FlxAtlasFrames
 	{
@@ -118,7 +122,6 @@ class LocalAtlasTextures
 		return sprite;
 	}
 	#else
-
 	public static function getAnimateSprite(x:Float, y:Float, folderPath:String, ?group:String):FlxSprite
 	{
 		return new FlxSprite(x, y);
@@ -221,9 +224,48 @@ class LocalAtlasTextures
 		_totalMisses++; _totalLoaded++;
 		var t = haxe.Timer.stamp();
 
-		var frames:FlxAtlasFrames = switch (fmt) {
-			case PACKER: Paths.getPackerAtlas(path);
-			default: Paths.getSparrowAtlas(path);
+		var frames:FlxAtlasFrames = null;
+
+		// --- ОБХОД Paths.hx ДЛЯ КАСТОМНЫХ ПАПОК ---
+		#if sys
+		var key = _imageKey(path);
+		var imgExt = '.png';
+		var metaExt = (fmt == PACKER) ? '.txt' : '.xml';
+		var imagePath = '';
+		var metaPath = '';
+
+		var possibleBases = ['assets/', 'assets/shared/', 'mods/', 'content/', ''];
+		for (base in possibleBases) {
+			if (FileSystem.exists(base + 'images/' + key + imgExt) && FileSystem.exists(base + 'images/' + key + metaExt)) {
+				imagePath = base + 'images/' + key + imgExt;
+				metaPath = base + 'images/' + key + metaExt;
+				break;
+			}
+			if (FileSystem.exists(base + key + imgExt) && FileSystem.exists(base + key + metaExt)) {
+				imagePath = base + key + imgExt;
+				metaPath = base + key + metaExt;
+				break;
+			}
+		}
+
+		// Если мы нашли физические пути на диске, грузим напрямую во Flixel!
+		if (imagePath != '' && metaPath != '') {
+			var graphic = FlxG.bitmap.add(imagePath, false, imagePath);
+			var metaContent = File.getContent(metaPath);
+			
+			if (fmt == PACKER)
+				frames = FlxAtlasFrames.fromSpriteSheetPacker(graphic, metaContent);
+			else
+				frames = FlxAtlasFrames.fromSparrow(graphic, metaContent);
+		}
+		#end
+
+		// Если файл лежит в стандартной папке и мы его не поймали ручным поиском, используем движок
+		if (frames == null) {
+			frames = switch (fmt) {
+				case PACKER: Paths.getPackerAtlas(path);
+				default: Paths.getSparrowAtlas(path);
+			}
 		}
 
 		if (frames == null) { #if debug trace('[LocalAtlasTextures] Not found: $path'); #end return null; }
@@ -251,10 +293,22 @@ class LocalAtlasTextures
 	static function _detectFormat(path:String):AtlasFormat
 	{
 		var key = _imageKey(path);
+
+		#if sys
+		var possibleBases = ['assets/', 'assets/shared/', 'mods/', 'content/', ''];
+		for (base in possibleBases) {
+			if (FileSystem.exists(base + 'images/' + key + '/Animation.json')) return ANIMATE;
+			if (FileSystem.exists(base + 'images/' + key + '.xml')) return SPARROW;
+			if (FileSystem.exists(base + 'images/' + key + '.txt')) return PACKER;
+
+			if (FileSystem.exists(base + key + '/Animation.json')) return ANIMATE;
+			if (FileSystem.exists(base + key + '.xml')) return SPARROW;
+			if (FileSystem.exists(base + key + '.txt')) return PACKER;
+		}
+		#end
+
 		if (Paths.fileExists('images/$key/Animation.json', TEXT)) return ANIMATE;
-
 		if (Paths.fileExists('images/$key.xml', TEXT)) return SPARROW;
-
 		if (Paths.fileExists('images/$key.txt', TEXT)) return PACKER;
 
 		return SPARROW;
@@ -263,6 +317,15 @@ class LocalAtlasTextures
 	static function _resolveAnimatePath(folderPath:String):String
 	{
 		var key = _imageKey(folderPath);
+
+		#if sys
+		var possibleBases = ['assets/', 'assets/shared/', 'mods/', 'content/', ''];
+		for (base in possibleBases) {
+			if (FileSystem.exists(base + 'images/' + key + '/Animation.json')) return base + 'images/' + key;
+			if (FileSystem.exists(base + key + '/Animation.json')) return base + key;
+		}
+		#end
+
 		var animPath = Paths.getPath('images/$key/Animation.json', TEXT);
 		if (openfl.utils.Assets.exists(animPath))
 		{
