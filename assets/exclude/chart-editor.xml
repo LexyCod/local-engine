@@ -1,0 +1,296 @@
+<absolute width="100%" height="100%">
+    <style>
+        * {
+            font-name: "assets/fonts/vcr.ttf";
+            font-size: 13px;
+        }
+        .panel {
+            background-color: #2C2D2F;
+            border: 2px solid #444444;
+        }
+        .title-bar {
+            background-color: #1E1F22;
+            padding: 5px 8px;
+            cursor: move;
+        }
+        .section-label {
+            color: #CCCCCC;
+            font-weight: bold;
+            margin-top: 6px;
+            margin-bottom: 2px;
+        }
+        .danger-btn {
+            color: #FF7777;
+        }
+        .success-btn {
+            color: #77FF77;
+        }
+        .tab-content {
+            padding: 10px;
+            spacing: 7px;
+        }
+    </style>
+
+
+    <vbox id="windowChart" width="310" height="580" styleName="panel" left="20" top="20">
+        <hbox width="100%" styleName="title-bar" id="dragChart">
+            <label text="Chart Editor" style="color: #FFFFFF; font-weight: bold;" />
+        </hbox>
+
+        <tabview id="uiBox" width="100%" height="540" style="border: none;">
+
+            <!-- ===== TAB: SONG ===== -->
+            <vbox text="Song" styleName="tab-content" width="100%" height="100%">
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Song Name:" style="min-width: 80px;" />
+                    <textfield id="txtSongTitle" width="100%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; margin-top: 4px;">
+                    <button id="btnSave"         text="Save Chart"    width="50%" styleName="success-btn" />
+                    <button id="btnSaveEvents"   text="Save Events"   width="50%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px;">
+                    <button id="btnReloadAudio"  text="Reload Audio"  width="50%" />
+                    <button id="btnReloadJson"   text="Reload JSON"   width="50%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px;">
+                    <button id="btnLoadAutosave" text="Load Autosave" width="50%" />
+                    <button id="btnLoadEvents"   text="Load Events"   width="50%" />
+                </hbox>
+
+                <label styleName="section-label" text="Song Properties" />
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="BPM:" style="min-width: 40px;" />
+                    <numberstepper id="stepBPM" min="1" max="400" step="1" pos="150" width="80" />
+                    <label text="Speed:" style="min-width: 45px;" />
+                    <numberstepper id="stepSpeed" min="0.1" max="10" step="0.1" pos="1" width="70" />
+                </hbox>
+
+                <checkbox id="chkNeedsVoices" text="Has Voice Track" />
+
+                <label styleName="section-label" text="Characters" />
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Player:" style="min-width: 55px;" />
+                    <dropdown id="dropPlayer1" width="100%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Opponent:" style="min-width: 55px;" />
+                    <dropdown id="dropPlayer2" width="100%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="GF:" style="min-width: 55px;" />
+                    <dropdown id="dropGF" width="100%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Stage:" style="min-width: 55px;" />
+                    <dropdown id="dropStage" width="100%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; margin-top: 6px;">
+                    <button id="btnClearNotes"  text="Clear Notes"  width="50%" styleName="danger-btn" />
+                    <button id="btnClearEvents" text="Clear Events" width="50%" styleName="danger-btn" />
+                </hbox>
+
+            </vbox>
+
+            <vbox text="Section" styleName="tab-content" width="100%" height="100%">
+
+                <hbox width="100%" style="spacing: 10px; vertical-align: center;">
+                    <label text="Beats/Section:" />
+                    <numberstepper id="stepBeats" min="1" max="7" step="1" pos="4" width="70" />
+                </hbox>
+
+                <checkbox id="chkMustHit"  text="Must Hit Section" />
+                <checkbox id="chkGFSection" text="GF Section" />
+                <checkbox id="chkAltAnim"  text="Alt Animation" />
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center; margin-top: 4px;">
+                    <checkbox id="chkChangeBPM" text="Change BPM" />
+                    <numberstepper id="stepSectionBPM" min="1" max="999" step="1" pos="150" width="80" />
+                </hbox>
+
+                <label styleName="section-label" text="Copy / Paste" style="margin-top: 8px;" />
+
+                <hbox width="100%" style="spacing: 5px;">
+                    <checkbox id="chkCopyNotes"  text="Notes"  selected="true" width="50%" />
+                    <checkbox id="chkCopyEvents" text="Events" selected="true" width="50%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; margin-top: 2px;">
+                    <button id="btnCopySection"  text="Copy"  width="33%" />
+                    <button id="btnPasteSection" text="Paste" width="33%" />
+                    <button id="btnClearSection" text="Clear" width="33%" styleName="danger-btn" />
+                </hbox>
+
+                <label styleName="section-label" text="Tools" style="margin-top: 8px;" />
+
+                <hbox width="100%" style="spacing: 5px;">
+                    <button id="btnSwapSection"  text="Swap"   width="50%" />
+                    <button id="btnMirrorNotes"  text="Mirror" width="50%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; margin-top: 3px;">
+                    <button id="btnDuetNotes"    text="Duet"   width="50%" />
+                    <button id="btnCopyLast"     text="Copy Last" width="50%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center; margin-top: 2px;">
+                    <label text="Offset:" />
+                    <numberstepper id="stepCopyOffset" min="-999" max="999" step="1" pos="1" width="80" />
+                </hbox>
+
+            </vbox>
+
+            <vbox text="Note" styleName="tab-content" width="100%" height="100%">
+
+                <label styleName="section-label" text="Selected Note" />
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Strum Time (ms):" style="min-width: 100px;" />
+                    <textfield id="txtStrumTime" text="0" width="100%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center; margin-top: 4px;">
+                    <label text="Sustain Length:" style="min-width: 100px;" />
+                    <numberstepper id="stepSusLength" min="0" max="99999" step="1" pos="0" width="100%" />
+                </hbox>
+
+                <label text="Note Type:" style="margin-top: 6px;" />
+                <dropdown id="dropNoteType" width="100%" />
+
+            </vbox>
+
+            <vbox text="Events" styleName="tab-content" width="100%" height="100%">
+
+                <label text="Event Type:" />
+                <dropdown id="dropEvent" width="100%" />
+
+                <hbox width="100%" style="spacing: 5px; margin-top: 4px;">
+                    <button id="btnAddEvent"    text="+" width="22%" style="color: #77FF77;" />
+                    <button id="btnRemoveEvent" text="-" width="22%" styleName="danger-btn" />
+                    <button id="btnPrevEvent"   text="&lt;" width="27%" />
+                    <button id="btnNextEvent"   text="&gt;" width="27%" />
+                </hbox>
+
+                <label id="lblSelectedEvent" text="Selected Event: None" style="color: #AAAAAA; margin-top: 2px;" />
+
+                <hbox width="100%" style="spacing: 5px; margin-top: 4px; vertical-align: center;">
+                    <label text="Value 1:" style="min-width: 55px;" />
+                    <textfield id="txtValue1" width="100%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Value 2:" style="min-width: 55px;" />
+                    <textfield id="txtValue2" width="100%" />
+                </hbox>
+
+                <label id="txtEventDesc" text="" width="100%"
+                    style="color: #AAAAAA; font-size: 11px; margin-top: 6px; wrap: true;" />
+
+            </vbox>
+
+            <vbox text="Charting" styleName="tab-content" width="100%" height="100%">
+
+                <checkbox id="chkMetronome"     text="Metronome" />
+                <checkbox id="chkDisableScroll" text="Disable Autoscroll (not recommended)" />
+                <checkbox id="chkVortex"        text="Vortex Editor (BETA)" />
+                <checkbox id="chkMouseQuant"    text="Mouse Scroll Quantization" />
+                <checkbox id="chkIgnoreWarnings" text="Ignore Progress Warnings" />
+
+                <label styleName="section-label" text="Metronome" style="margin-top: 6px;" />
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="BPM:" style="min-width: 35px;" />
+                    <numberstepper id="stepMetroBPM" min="1" max="1500" step="5" pos="150" width="80" />
+                    <label text="Offset ms:" />
+                    <numberstepper id="stepMetroOffset" min="0" max="1000" step="25" pos="0" width="80" />
+                </hbox>
+
+                <label styleName="section-label" text="Waveform" style="margin-top: 6px;" />
+                <hbox width="100%" style="spacing: 5px;">
+                    <checkbox id="chkWaveInst"     text="Instrumental" width="33%" />
+                    <checkbox id="chkWaveVoices"   text="Vocals"       width="33%" />
+                    <checkbox id="chkWaveOppVoices" text="Opp. Vocals" width="33%" />
+                </hbox>
+
+                <label styleName="section-label" text="Volume" style="margin-top: 6px;" />
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Inst:" style="min-width: 30px;" />
+                    <numberstepper id="stepInstVol"    min="0" max="1" step="0.1" pos="1" width="70" />
+                    <checkbox id="chkMuteInst"     text="Mute" width="50%" />
+                </hbox>
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Vocals:" style="min-width: 40px;" />
+                    <numberstepper id="stepVocalsVol"  min="0" max="1" step="0.1" pos="1" width="70" />
+                    <checkbox id="chkMuteVocals"   text="Mute" width="50%" />
+                </hbox>
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Opp:" style="min-width: 40px;" />
+                    <numberstepper id="stepOppVol"     min="0" max="1" step="0.1" pos="1" width="70" />
+                    <checkbox id="chkMuteOpp"      text="Mute" width="50%" />
+                </hbox>
+
+                <label styleName="section-label" text="Playback" style="margin-top: 6px;" />
+                <checkbox id="chkPlaySoundBF"  text="Play Note Sound (BF)" />
+                <checkbox id="chkPlaySoundDad" text="Play Note Sound (Opponent)" />
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center; margin-top: 4px;">
+                    <label text="Rate:" style="min-width: 35px;" />
+                    <slider id="sldPlaybackRate" min="0.5" max="3" pos="1" width="100%" />
+                </hbox>
+
+            </vbox>
+
+            <vbox text="Data" styleName="tab-content" width="100%" height="100%">
+
+                <label styleName="section-label" text="Note Appearance" />
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Note Skin:" style="min-width: 70px;" />
+                    <textfield id="txtNoteSkin" width="100%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Splashes:" style="min-width: 70px;" />
+                    <textfield id="txtNoteSplashes" width="100%" />
+                </hbox>
+
+                <button id="btnChangeNotes" text="Apply Note Texture" width="100%" style="margin-top: 4px;" />
+                <checkbox id="chkDisableNoteRGB" text="Disable Note RGB" style="margin-top: 4px;" />
+
+                <label styleName="section-label" text="Game Over" style="margin-top: 8px;" />
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Character:" style="min-width: 70px;" />
+                    <textfield id="txtGameOverChar" width="100%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Death Sound:" style="min-width: 70px;" />
+                    <textfield id="txtGameOverSound" width="100%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Loop Music:" style="min-width: 70px;" />
+                    <textfield id="txtGameOverLoop" width="100%" />
+                </hbox>
+
+                <hbox width="100%" style="spacing: 5px; vertical-align: center;">
+                    <label text="Retry Music:" style="min-width: 70px;" />
+                    <textfield id="txtGameOverEnd" width="100%" />
+                </hbox>
+
+            </vbox>
+
+        </tabview>
+    </vbox>
+
+</absolute>
